@@ -458,10 +458,14 @@ async function seed(store: Store): Promise<void> {
     const targets = matches.slice(0, 4).map((m) => m.lender.id)
     if (!targets.length) continue
 
+    // Two of the deals also go onto the marketplace, so the demo shows both
+    // postures: a deal shared only with named lenders, and one discoverable by
+    // any verified lender under its anonymised label.
+    const scope = ['lakeview', 'northgate'].includes(fixture.slug) ? 'marketplace' : 'matched_lenders'
     await distributeDeal({
       actor,
       dealId: deal.id,
-      scope: 'matched_lenders',
+      scope,
       lenderIds: targets,
     }).catch((error) => console.error('[seed] distribution failed', deal.reference, error.message ?? error))
 

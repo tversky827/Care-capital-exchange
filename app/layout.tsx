@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   description:
     'Transform your healthcare financing opportunity into an institutional-quality financing package and connect with lenders whose lending criteria fit your deal.',
   robots: { index: false, follow: false },
+  icons: { icon: '/icon.svg' },
 }
 
 export const viewport: Viewport = {

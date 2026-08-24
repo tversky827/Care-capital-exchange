@@ -1,6 +1,7 @@
 import 'server-only'
 import { db } from '@/db'
 import type { Actor } from '@/lib/auth/session'
+import { log } from '@/lib/observability'
 import type { AuditLog } from '@/types'
 
 /**
@@ -41,7 +42,7 @@ export async function recordAudit(input: AuditInput): Promise<void> {
       ip: input.ip ?? null,
     } as Omit<AuditLog, 'id' | 'created_at'>)
   } catch (error) {
-    console.error('[audit] failed to record event', input.action, error)
+    log.error('audit write failed', error, { action: input.action, entityType: input.entityType })
   }
 }
 

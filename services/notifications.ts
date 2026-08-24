@@ -1,5 +1,6 @@
 import 'server-only'
 import { db } from '@/db'
+import { log } from '@/lib/observability'
 import type { Notification } from '@/types'
 
 /**
@@ -69,7 +70,7 @@ export interface EmailTransport {
 class ConsoleEmailTransport implements EmailTransport {
   readonly name = 'console'
   async send(message: EmailMessage): Promise<void> {
-    console.info(`[email:${this.name}] to=${message.to} subject="${message.subject}"`)
+    log.info('email dispatched', { transport: this.name, to: message.to, subject: message.subject })
   }
 }
 
@@ -140,7 +141,7 @@ export async function notify(input: NotifyInput): Promise<Notification[]> {
         })
         await store.update('notifications', notification.id, { emailed_at: new Date().toISOString() })
       } catch (error) {
-        console.error('[notifications] email delivery failed', error)
+        log.error('email delivery failed', error, { event: input.event, transport: transport.name })
       }
     }
   }

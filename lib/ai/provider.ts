@@ -193,12 +193,34 @@ export function aiProviderIsLive(): boolean {
 /**
  * Runs an AI request, records usage, and returns a validated result. Callers
  * never see an unvalidated response and never need to handle a provider error.
+ *
+ * When the configured monthly spend ceiling has been reached, the request is
+ * served by the deterministic analyst instead. That is the right failure mode
+ * for a budget: the product keeps working and the reason is recorded, rather
+ * than the platform either overspending silently or refusing to underwrite.
  */
 export async function runAi<T>(request: AiRequest<T>): Promise<AiResult<T>> {
   const documentText = (request.documents ?? []).map((d) => d.content).join('\n')
   const injectionFindings = documentText ? scanForInjection(documentText) : []
-  const result = await getAiProvider().generate(request)
-  return { ...result, injectionFindings }
+
+  let provider = getAiProvider()
+  let budgetNote: string | null = null
+  if (provider.name !== 'local-analyst') {
+    // Imported lazily: the usage service reaches the database, and the AI layer
+    // must stay importable from anywhere without dragging that in.
+    const { budgetExhausted } = await import('@/services/ai-usage')
+    if (await budgetExhausted().catch(() => false)) {
+      provider = new LocalAnalystProvider()
+      budgetNote = 'Monthly AI budget reached; served by the deterministic analyst.'
+    }
+  }
+
+  const result = await provider.generate(request)
+  return {
+    ...result,
+    fallbackReason: budgetNote ?? result.fallbackReason,
+    injectionFindings,
+  }
 }
 
 export type { UntrustedDocument }

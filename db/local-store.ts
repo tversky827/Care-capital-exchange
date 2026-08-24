@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { applyQuery, matchesWhere, type Query, type Where } from './query'
@@ -29,6 +29,9 @@ export class LocalStore implements Store {
   private flushTimer: NodeJS.Timeout | null = null
   /** Serialises flushes so two writers cannot race on the same temp file. */
   private flushChain: Promise<void> = Promise.resolve()
+  /** Modification time of the database as last read, for change detection. */
+  private lastMtimeMs = 0
+  private lastMtimeCheck = 0
   private readonly persist: boolean
 
   constructor(options: { persist?: boolean } = {}) {
@@ -43,17 +46,47 @@ export class LocalStore implements Store {
   }
 
   private async load(): Promise<void> {
-    if (this.loaded) return
+    if (this.loaded) {
+      await this.reloadIfChangedOnDisk()
+      return
+    }
     this.loaded = true
     if (!this.persist) return
+    await this.readFromDisk()
+  }
+
+  private async readFromDisk(): Promise<void> {
     try {
       const raw = await readFile(DB_FILE, 'utf8')
       const parsed = JSON.parse(raw) as Database
       const next = emptyDatabase()
       for (const table of TABLE_NAMES) next[table] = parsed[table] ?? []
       this.db = next
+      this.lastMtimeMs = (await stat(DB_FILE)).mtimeMs
     } catch {
       // No database on disk yet — start from an empty one.
+    }
+  }
+
+  /**
+   * Picks up a database rewritten by another process.
+   *
+   * Running `npm run seed` while the dev server is up would otherwise leave the
+   * server serving a copy of a database that no longer exists, and every
+   * session minted against the new one would be rejected. The check is a stat
+   * at most once a second, and it is skipped whenever this process has writes
+   * of its own that have not reached disk, so a reload can never lose them.
+   */
+  private async reloadIfChangedOnDisk(): Promise<void> {
+    if (!this.persist || this.dirty) return
+    const now = Date.now()
+    if (now - this.lastMtimeCheck < 1000) return
+    this.lastMtimeCheck = now
+    try {
+      const { mtimeMs } = await stat(DB_FILE)
+      if (mtimeMs > this.lastMtimeMs) await this.readFromDisk()
+    } catch {
+      // The database has been removed; keep serving what is in memory.
     }
   }
 
@@ -80,6 +113,8 @@ export class LocalStore implements Store {
       const tmp = `${DB_FILE}.${process.pid}.${randomUUID()}.tmp`
       await writeFile(tmp, snapshot, 'utf8')
       await rename(tmp, DB_FILE)
+      // Our own write must not look like an external change on the next check.
+      this.lastMtimeMs = (await stat(DB_FILE)).mtimeMs
     })
     this.flushChain = run.catch((error) => {
       console.error('[store] flush failed', error)

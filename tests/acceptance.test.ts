@@ -664,6 +664,49 @@ describe('acceptance: confidentiality across the marketplace', () => {
     expect(await lenderNotes(borrower, deal.id)).toHaveLength(0)
   })
 
+  it('shows a marketplace browser the anonymised label, not the facility', async () => {
+    const { displayName, displayLocation, anonymizedLabel } = await import('@/lib/deal/display')
+    const { canViewDealIdentity } = await import('@/lib/policy')
+    const { subjectOf } = await import('@/lib/access')
+
+    const store2 = store
+    const facility = await store2.selectOne('facilities', { where: { deal_id: deal.id } })
+    const current = (await store2.findById('deals', deal.id))!
+
+    // A lender with no distribution — discovery only.
+    const browser = await createActor(store2, {
+      email: 'browsing@thirdlender.test',
+      name: 'Browsing Lender',
+      companyName: 'Third Lender Capital',
+      companyType: 'lender',
+      role: 'lender',
+    })
+    await store2.insert('lenders', {
+      company_id: browser.company.id, institution_name: 'Third Lender Capital',
+      institution_type: 'bank', description: null, logo_initials: 'TL',
+      verification_status: 'verified', verified_at: new Date().toISOString(), verified_by: null,
+      contact_name: null, contact_email: null, contact_phone: null,
+      public_profile_fields: [], responsiveness_score: 50, is_demo: false,
+    } as never)
+    const browsing = await attachLender(store2, browser)
+
+    const canSee = canViewDealIdentity(subjectOf(browsing), current, { distribution: null })
+    expect(canSee).toBe(false)
+
+    const shown = displayName(current, facility, canSee)
+    expect(shown).toBe(anonymizedLabel(current, facility))
+    expect(shown).not.toContain('Cedar Point')
+    expect(shown).toMatch(/\d+-bed Skilled Nursing Facility/)
+    // Location narrows to the state only.
+    expect(displayLocation(facility, canSee)).toBe('Illinois')
+
+    // A lender the deal was distributed to does see the identity.
+    const distribution = await store2.selectOne('deal_distributions', {
+      where: { deal_id: deal.id, lender_id: lenderA.lender!.id },
+    })
+    expect(canViewDealIdentity(subjectOf(lenderA), current, { distribution })).toBe(true)
+  })
+
   it('denies an unrelated borrower access to the deal', async () => {
     const other = await createActor(store, {
       email: 'other@rival.test',

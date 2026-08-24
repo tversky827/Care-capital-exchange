@@ -1,6 +1,7 @@
 import 'server-only'
 import { db } from '@/db'
 import { monthlyBudgetUsd } from '@/lib/ai/routing'
+import { log } from '@/lib/observability'
 import type { AiUsageEvent } from '@/types'
 
 /**
@@ -38,7 +39,7 @@ export async function recordAiUsage(input: UsageInput): Promise<void> {
       success: input.success,
     } as Omit<AiUsageEvent, 'id' | 'created_at'>)
   } catch (error) {
-    console.error('[ai-usage] failed to record usage', error)
+    log.error('ai usage write failed', error, { task: input.task, provider: input.provider })
   }
 }
 

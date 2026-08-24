@@ -1,5 +1,6 @@
 import 'server-only'
 import { db } from '@/db'
+import { log, timed } from '@/lib/observability'
 import type { Job } from '@/types'
 
 /**
@@ -58,7 +59,7 @@ export async function enqueue(options: EnqueueOptions): Promise<Job> {
   } else {
     // Fire and forget: the caller gets a job id to poll, and a failure here is
     // recorded on the job row rather than thrown into the user's request.
-    void runJob(job.id).catch((error) => console.error('[jobs] execution failed', job.kind, error))
+    void runJob(job.id).catch((error) => log.error('job execution failed', error, { kind: job.kind, jobId: job.id }))
   }
   return (await store.findById('jobs', job.id)) ?? job
 }
@@ -87,7 +88,7 @@ export async function runJob(jobId: string): Promise<Job | null> {
   })
 
   try {
-    await handler(job.payload, job)
+    await timed(`job.${job.kind}`, () => handler(job.payload, job), { jobId, dealId: job.deal_id })
     return store.update('jobs', jobId, {
       status: 'succeeded',
       last_error: null,

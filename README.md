@@ -270,10 +270,6 @@ The deals deliberately span every state worth demonstrating: one draft, two
 needing attention (a document conflict and an appraisal below contract), three
 ready to distribute, and four with live indications.
 
-> After running `npm run seed` while `npm run dev` is running, restart the dev
-> server. The local driver caches the database in memory, so a running server
-> will not see a database rewritten underneath it.
-
 ---
 
 ## AI provider setup

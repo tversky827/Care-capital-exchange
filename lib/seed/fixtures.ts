@@ -389,7 +389,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 75,
     payer: { medicare: 16, medicaid: 58, managedCare: 12, privatePay: 12, other: 2 },
     periods: history(
-      { revenue: 18_400_000, ebitdaMargin: 0.147, beds: 120, occupancy: 87 },
+      { revenue: 18_400_000, ebitdaMargin: 0.088, beds: 120, occupancy: 87 },
       { revenueGrowth: [0.918, 0.935, 1], marginDelta: [-0.018, -0.005, 0], agency: [0.136, 0.102, 0.061], occupancy: [86.1, 85.4, 87] },
     ),
     narrative:
@@ -413,7 +413,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 110,
     payer: { medicare: 19, medicaid: 51, managedCare: 15, privatePay: 13, other: 2 },
     periods: history(
-      { revenue: 14_600_000, ebitdaMargin: 0.163, beds: 96, occupancy: 88.5 },
+      { revenue: 14_600_000, ebitdaMargin: 0.098, beds: 96, occupancy: 88.5 },
       { revenueGrowth: [0.93, 0.965, 1], marginDelta: [-0.012, -0.004, 0], agency: [0.088, 0.061, 0.038], occupancy: [85.4, 87.1, 88.5] },
     ),
     narrative:
@@ -437,7 +437,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 95,
     payer: { medicare: 11, medicaid: 74, managedCare: 8, privatePay: 5, other: 2 },
     periods: history(
-      { revenue: 19_800_000, ebitdaMargin: 0.096, beds: 140, occupancy: 84.3 },
+      { revenue: 19_800_000, ebitdaMargin: 0.058, beds: 140, occupancy: 84.3 },
       { revenueGrowth: [0.955, 0.978, 1], marginDelta: [0.004, -0.002, 0], agency: [0.171, 0.158, 0.142], occupancy: [82.1, 83.4, 84.3] },
     ),
     narrative:
@@ -462,7 +462,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 120,
     payer: { medicare: 21, medicaid: 47, managedCare: 14, privatePay: 16, other: 2 },
     periods: history(
-      { revenue: 12_300_000, ebitdaMargin: 0.178, beds: 82, occupancy: 89 },
+      { revenue: 12_300_000, ebitdaMargin: 0.107, beds: 82, occupancy: 89 },
       { revenueGrowth: [0.941, 0.972, 1], marginDelta: [-0.009, -0.003, 0], agency: [0.062, 0.041, 0.024], occupancy: [86.8, 88.2, 89] },
     ),
     narrative:
@@ -486,7 +486,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 60,
     payer: { medicare: 13, medicaid: 69, managedCare: 10, privatePay: 6, other: 2 },
     periods: history(
-      { revenue: 19_100_000, ebitdaMargin: 0.071, beds: 150, occupancy: 74 },
+      { revenue: 19_100_000, ebitdaMargin: 0.043, beds: 150, occupancy: 74 },
       { revenueGrowth: [1.062, 1.031, 1], marginDelta: [0.041, 0.019, 0], agency: [0.094, 0.148, 0.201], occupancy: [81.2, 77.6, 74] },
     ),
     narrative:
@@ -510,7 +510,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 40,
     payer: { medicare: 18, medicaid: 55, managedCare: 13, privatePay: 12, other: 2 },
     periods: history(
-      { revenue: 15_900_000, ebitdaMargin: 0.128, beds: 110, occupancy: 83.6 },
+      { revenue: 15_900_000, ebitdaMargin: 0.077, beds: 110, occupancy: 83.6 },
       { revenueGrowth: [0.947, 0.974, 1], marginDelta: [-0.021, -0.008, 0], agency: [0.121, 0.094, 0.072], occupancy: [79.8, 81.9, 83.6] },
     ),
     narrative:
@@ -534,7 +534,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 150,
     payer: { medicare: 28, medicaid: 34, managedCare: 17, privatePay: 19, other: 2 },
     periods: history(
-      { revenue: 22_600_000, ebitdaMargin: 0.201, beds: 124, occupancy: 91.9 },
+      { revenue: 22_600_000, ebitdaMargin: 0.121, beds: 124, occupancy: 91.9 },
       { revenueGrowth: [0.929, 0.964, 1], marginDelta: [-0.014, -0.006, 0], agency: [0.041, 0.026, 0.014], occupancy: [89.1, 90.8, 91.9] },
     ),
     narrative:
@@ -558,7 +558,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 85,
     payer: { medicare: 15, medicaid: 63, managedCare: 12, privatePay: 8, other: 2 },
     periods: history(
-      { revenue: 16_400_000, ebitdaMargin: 0.104, beds: 130, occupancy: 71.5 },
+      { revenue: 16_400_000, ebitdaMargin: 0.062, beds: 130, occupancy: 71.5 },
       { revenueGrowth: [0.986, 0.991, 1], marginDelta: [0.011, 0.004, 0], agency: [0.132, 0.118, 0.104], occupancy: [74.8, 72.9, 71.5] },
     ),
     narrative:
@@ -582,7 +582,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 130,
     payer: { medicare: 24, medicaid: 41, managedCare: 19, privatePay: 14, other: 2 },
     periods: history(
-      { revenue: 13_700_000, ebitdaMargin: 0.174, beds: 90, occupancy: 90 },
+      { revenue: 13_700_000, ebitdaMargin: 0.104, beds: 90, occupancy: 90 },
       { revenueGrowth: [0.951, 0.977, 1], marginDelta: [-0.007, -0.002, 0], agency: [0.054, 0.038, 0.029], occupancy: [88.4, 89.2, 90] },
     ),
     narrative:
@@ -606,7 +606,7 @@ export const DEALS: DealFixture[] = [
     targetCloseInDays: 70,
     payer: { medicare: 20, medicaid: 52, managedCare: 16, privatePay: 10, other: 2 },
     periods: history(
-      { revenue: 21_300_000, ebitdaMargin: 0.121, beds: 132, occupancy: 84.8 },
+      { revenue: 21_300_000, ebitdaMargin: 0.073, beds: 132, occupancy: 84.8 },
       { revenueGrowth: [0.938, 0.969, 1], marginDelta: [-0.011, -0.004, 0], agency: [0.109, 0.087, 0.068], occupancy: [82.3, 83.6, 84.8] },
     ),
     narrative:
