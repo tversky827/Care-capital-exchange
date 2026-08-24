@@ -1,4 +1,5 @@
 import type { CreditAnalysisPayload } from '@/lib/ai/schemas'
+import { assetNoun, stateName } from '@/lib/deal/display'
 import type { DealSnapshot } from '@/lib/deal/snapshot'
 import type { DealScore } from '@/lib/underwriting/score'
 import { formatCurrency, formatPercent, formatRatio, titleize } from '@/lib/utils/format'
@@ -316,8 +317,8 @@ function buildSummary(snapshot: DealSnapshot, score: DealScore, strengthCount: n
   const beds = facility?.operating_beds ?? facility?.licensed_beds
   const descriptor = [
     beds ? `${beds}-bed` : null,
-    titleize(deal.asset_type).toLowerCase(),
-    facility?.state ? `in ${facility.state}` : null,
+    assetNoun(deal.asset_type),
+    facility?.state ? `in ${stateName(facility.state)}` : null,
   ].filter(Boolean).join(' ')
 
   const metrics = [

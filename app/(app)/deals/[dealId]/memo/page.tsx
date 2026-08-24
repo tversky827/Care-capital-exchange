@@ -99,7 +99,7 @@ export default async function MemoPage({ params }: { params: Promise<{ dealId: s
       </Alert>
 
       {canEdit ? (
-        <MemoEditor dealId={dealId} sections={version.sections} />
+        <MemoEditor dealId={dealId} versionId={version.id} sections={version.sections} />
       ) : (
         <div className="space-y-3">
           {version.sections.map((section) => (

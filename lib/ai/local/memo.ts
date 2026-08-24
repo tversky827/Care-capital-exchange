@@ -1,4 +1,5 @@
 import type { CreditAnalysisPayload, CreditMemoPayload } from '@/lib/ai/schemas'
+import { assetNoun } from '@/lib/deal/display'
 import type { DealSnapshot, PeriodView } from '@/lib/deal/snapshot'
 import type { DealScore } from '@/lib/underwriting/score'
 import { formatCurrency, formatPercent, formatRatio, titleize } from '@/lib/utils/format'
@@ -89,6 +90,7 @@ export function generateMemo(input: MemoInput): CreditMemoPayload {
 
   const beds = facility?.operating_beds ?? facility?.licensed_beds ?? null
   const assetLabel = titleize(deal.asset_type)
+  const assetNounLabel = assetNoun(deal.asset_type)
   const facilityName = facility?.name ?? deal.name
   const location = [facility?.city, facility?.state].filter(Boolean).join(', ')
 
@@ -109,7 +111,7 @@ export function generateMemo(input: MemoInput): CreditMemoPayload {
       : ''
 
     add('executive_summary', 'Executive Summary', `
-${facilityName}${location ? `, ${location}` : ''} is a ${beds ? `${beds}-bed ` : ''}${assetLabel.toLowerCase()} facility. The sponsor is seeking ${formatCurrency(summary.loanAmount)}${loanCite} of ${titleize(deal.transaction_type).toLowerCase()} financing${terms?.purchase_price ? ` in connection with a ${formatCurrency(terms.purchase_price)} acquisition` : ''}.
+${facilityName}${location ? `, ${location}` : ''} is a ${beds ? `${beds}-bed ` : ''}${assetNounLabel}. The sponsor is seeking ${formatCurrency(summary.loanAmount)}${loanCite} of ${titleize(deal.transaction_type).toLowerCase()} financing${terms?.purchase_price ? ` in connection with a ${formatCurrency(terms.purchase_price)} acquisition` : ''}.
 
 For ${periodLabel(latest)}, the facility generated revenue of ${formatCurrency(latest?.items.revenue ?? null)}${revenueCite} and EBITDA of ${formatCurrency(latest?.items.ebitda ?? null)}${ebitdaCite}, an EBITDA margin of ${formatPercent(summary.ebitdaMargin)}. Underwritten net operating income, after an imputed management fee and replacement reserve, is ${formatCurrency(summary.noi)}.
 
@@ -317,7 +319,7 @@ ${sponsor
   ? [
       `Legal entity: ${sponsor.legal_entity}`,
       `Years in healthcare: ${sponsor.years_in_healthcare ?? '—'}`,
-      `Years operating ${assetLabel.toLowerCase()}: ${sponsor.years_operating_asset_type ?? '—'}`,
+      `Years operating ${assetLabel}: ${sponsor.years_operating_asset_type ?? '—'}`,
       `Facilities operated: ${sponsor.facilities_operated ?? '—'}`,
       `Beds under management: ${sponsor.beds_operated ?? '—'}`,
       `States: ${sponsor.states_operated.join(', ') || '—'}`,

@@ -13,9 +13,23 @@ import type { MemoSection } from '@/types'
  * rather than overwriting — so the AI-generated original stays on the record
  * next to whatever a human changed.
  */
-export function MemoEditor({ dealId, sections }: { dealId: string; sections: MemoSection[] }) {
+export function MemoEditor({
+  dealId, versionId, sections,
+}: { dealId: string; versionId: string; sections: MemoSection[] }) {
   const [draft, setDraft] = useState(sections)
   const [editing, setEditing] = useState<string | null>(null)
+
+  // Regenerating or saving produces a new version on the server. Adopt it here
+  // rather than leaving the reader looking at the body of the version they just
+  // replaced. Keyed on the version rather than the array identity so an
+  // unrelated re-render never discards edits in progress.
+  const [syncedVersion, setSyncedVersion] = useState(versionId)
+  if (syncedVersion !== versionId) {
+    setSyncedVersion(versionId)
+    setDraft(sections)
+    setEditing(null)
+  }
+
   const [state, submit, pending] = useActionState<ActionState, FormData>(saveMemoAction, {})
   const dirty = JSON.stringify(draft) !== JSON.stringify(sections)
 
