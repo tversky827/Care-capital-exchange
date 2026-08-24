@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
 import { subjectOf } from '@/lib/access'
 import { canEditDeal } from '@/lib/policy'
-import { buildSnapshot, effectiveValue } from '@/lib/deal/snapshot'
+import { buildSnapshot } from '@/lib/deal/snapshot'
 import { Badge, Card, CardBody, EmptyState, Section, Table, Td, Th, Tr } from '@/components/ui/primitives'
 import { ConfidenceBadge, MetricTile } from '@/components/deal/common'
 import { ApproveRow } from './approve-row'
@@ -19,6 +20,8 @@ import { LINE_ITEM_KEYS, type LineItemKey } from '@/types'
  */
 export default async function FinancialsPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const actor = await requireActor()
   const snapshot = await buildSnapshot(dealId)
   if (!snapshot) notFound()

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { FileDown, Printer } from 'lucide-react'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
 import { subjectOf } from '@/lib/access'
 import { canEditDeal } from '@/lib/policy'
 import { currentMemo, memoVersions } from '@/services/memo'
@@ -22,6 +23,8 @@ import { formatDateTime } from '@/lib/utils/format'
  */
 export default async function MemoPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const actor = await requireActor()
 
   const snapshot = await buildSnapshot(dealId)

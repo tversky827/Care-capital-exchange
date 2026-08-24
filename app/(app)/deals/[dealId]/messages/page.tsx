@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
+
 import { threadsForDeal } from '@/services/messages'
 import { Badge, Card, CardBody, EmptyState, Section } from '@/components/ui/primitives'
 import { MessageComposer, NewThread } from './composer'
@@ -15,6 +17,8 @@ import { formatRelative, initials, titleize } from '@/lib/utils/format'
  */
 export default async function MessagesPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const actor = await requireActor()
 
   const store = await db()

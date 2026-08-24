@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
+
 import { auditForDeal } from '@/services/audit'
 import { Badge, Card, EmptyState, Section, Table, Td, Th, Tr } from '@/components/ui/primitives'
-import { formatBytes, formatDateTime, titleize } from '@/lib/utils/format'
+import { formatDateTime, titleize } from '@/lib/utils/format'
 
 /**
  * Activity.
@@ -13,6 +15,8 @@ import { formatBytes, formatDateTime, titleize } from '@/lib/utils/format'
  */
 export default async function ActivityPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   await requireActor()
 
   const store = await db()

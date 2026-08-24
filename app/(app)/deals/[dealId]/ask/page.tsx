@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
+
 import { SUGGESTED_QUESTIONS } from '@/services/chat'
 import { aiProviderIsLive } from '@/lib/ai/provider'
 import { Alert, Card, CardBody } from '@/components/ui/primitives'
@@ -8,6 +10,8 @@ import { AskPanel } from './ask-panel'
 
 export default async function AskPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   await requireActor()
 
   const store = await db()

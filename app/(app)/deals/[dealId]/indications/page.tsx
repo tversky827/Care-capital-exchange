@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
 import { subjectOf } from '@/lib/access'
 import { canSelectIndication } from '@/lib/policy'
 import { compareIndications, priorityLabel } from '@/services/indications'
@@ -20,6 +21,8 @@ import { formatCurrency, formatDate, formatPercent, formatRatio, titleize } from
  */
 export default async function IndicationsPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const actor = await requireActor()
 
   const store = await db()

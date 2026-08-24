@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
 import { subjectOf } from '@/lib/access'
 import { canDistributeDeal } from '@/lib/policy'
 import { previewDistribution } from '@/services/distribution'
 import { readinessFor } from '@/services/underwriting'
 import { buildDataRequests } from '@/lib/ai/local/data-requests'
-import { Alert, Badge, Card, CardBody, EmptyState, Section, Table, Td, Th, Tr } from '@/components/ui/primitives'
+import { Alert, Badge, Card, EmptyState, Section, Table, Td, Th, Tr } from '@/components/ui/primitives'
 import { DistributePanel } from './distribute-panel'
 import { InlineAction } from '@/components/forms/action-form'
 import { revokeDistributionAction } from '../../actions'
@@ -22,6 +23,8 @@ import { formatRelative, titleize } from '@/lib/utils/format'
  */
 export default async function DistributePage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const actor = await requireActor()
 
   const store = await db()

@@ -8,7 +8,6 @@ import { matchDeal, type MatchableBox, type MatchableDeal } from '@/lib/matching
 import { scoreDeal } from '@/lib/underwriting/score'
 import { recordAudit } from './audit'
 import { notify } from './notifications'
-import { titleize } from '@/lib/utils/format'
 import type { Lender, LendingBox, Match } from '@/types'
 
 /**
@@ -103,20 +102,11 @@ export async function computeMatches(
         schemaName: 'MatchExplanation',
         schemaHint: '{ headline: string, narrative: string, concerns: string[] }',
         context: { lender: lender.institution_name, factors: outcome.factors, score: outcome.score, band: outcome.band },
-        local: () =>
-          explainMatch(outcome, lender.institution_name, {
-            loanAmount: matchable.loanAmount,
-            assetLabel: titleize(matchable.assetType),
-            state: matchable.state,
-          }),
+        local: () => explainMatch(outcome, lender.institution_name),
       })
       explanation = explained.data.narrative
     } else if (outcome.hardFail) {
-      explanation = explainMatch(outcome, lender.institution_name, {
-        loanAmount: matchable.loanAmount,
-        assetLabel: titleize(matchable.assetType),
-        state: matchable.state,
-      }).narrative
+      explanation = explainMatch(outcome, lender.institution_name).narrative
     }
 
     const payload = {

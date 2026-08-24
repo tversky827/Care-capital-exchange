@@ -6,7 +6,7 @@ import { recordAudit } from './audit'
 import { notify } from './notifications'
 import { computeMatches, matchesForDeal } from './matching'
 import { readinessFor } from './underwriting'
-import { transitionDeal } from './deals'
+import { advanceDealStatus, transitionDeal, transitionPath } from './deals'
 import { anonymizedLabel } from '@/lib/deal/display'
 import type { Actor } from '@/lib/auth/session'
 import type { DealDistribution, DistributionScope, Lender, PipelineStage } from '@/types'
@@ -154,8 +154,16 @@ export async function distributeDeal(input: DistributeInput): Promise<Distribute
     distributed_at: deal.distributed_at ?? new Date().toISOString(),
   })
 
-  if (deal.status === 'ready_for_distribution' || deal.status === 'underwriting' || deal.status === 'needs_attention') {
-    await transitionDeal(input.actor, input.dealId, 'distributed', `Shared with ${created.length} lenders.`)
+  // Bring the deal up to date before moving it, so a deal still sitting at
+  // intake because nothing advanced it does not block the transition.
+  if (created.length > 0) {
+    await advanceDealStatus(input.dealId, input.actor)
+    const current = await store.findById('deals', input.dealId)
+    if (current && transitionPath(current.status, 'distributed')) {
+      for (const step of transitionPath(current.status, 'distributed')!) {
+        await transitionDeal(input.actor, input.dealId, step, step === 'distributed' ? `Shared with ${created.length} lenders.` : undefined)
+      }
+    }
   }
 
   await recordAudit({

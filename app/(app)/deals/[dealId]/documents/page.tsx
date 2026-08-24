@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { Download, Eye, FileText, ShieldAlert } from 'lucide-react'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
 import { subjectOf } from '@/lib/access'
 import { canEditDeal } from '@/lib/policy'
 import { documentsForDeal } from '@/services/documents'
@@ -30,6 +31,8 @@ export default async function DocumentsPage({
   searchParams: Promise<{ created?: string }>
 }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const { created } = await searchParams
   const actor = await requireActor()
 

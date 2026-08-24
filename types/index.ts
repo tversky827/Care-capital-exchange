@@ -520,7 +520,8 @@ export interface DiscrepancyResolution {
   id: UUID
   discrepancy_id: UUID
   deal_id: UUID
-  resolved_by: UUID
+  /** Null when the platform closed the finding automatically. */
+  resolved_by: UUID | null
   action: 'resolve' | 'ignore' | 'request_clarification'
   resolution_note: string
   accepted_value: string | null

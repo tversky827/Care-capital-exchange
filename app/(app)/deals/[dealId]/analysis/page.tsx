@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
 import { subjectOf } from '@/lib/access'
 import { canEditDeal } from '@/lib/policy'
 import { buildSnapshot } from '@/lib/deal/snapshot'
@@ -26,6 +27,8 @@ import { formatDateTime, titleize } from '@/lib/utils/format'
  */
 export default async function AnalysisPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const actor = await requireActor()
 
   const snapshot = await buildSnapshot(dealId)

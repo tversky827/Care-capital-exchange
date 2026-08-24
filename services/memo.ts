@@ -110,6 +110,11 @@ export async function generateCreditMemo(dealId: string, actor: Actor): Promise<
     metadata: { version: nextVersion, provider: result.provider, sections: result.data.sections.length },
   })
 
+  // A completed memo can be the last thing standing between a deal and being
+  // distributable, so re-evaluate the status here.
+  const { advanceDealStatus } = await import('./deals')
+  await advanceDealStatus(dealId, actor)
+
   return { memo, version }
 }
 

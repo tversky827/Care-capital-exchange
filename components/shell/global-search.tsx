@@ -20,17 +20,20 @@ export function GlobalSearch() {
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const term = query.trim()
+  // Whether results are shown is derived from the query rather than mirrored
+  // into state, so a short query needs no effect to clear anything.
+  const visible = term.length >= 2 ? results : []
+
   useEffect(() => {
     const term = query.trim()
-    if (term.length < 2) {
-      setResults([])
-      setLoading(false)
-      return
-    }
-    setLoading(true)
+    if (term.length < 2) return
     const controller = new AbortController()
-    // Debounced so typing does not fire a request per keystroke.
+    // Debounced so typing does not fire a request per keystroke. The loading
+    // flag is set when the request actually starts rather than on every
+    // keystroke, which also avoids a flash of "Searching…" while debouncing.
     const timer = setTimeout(async () => {
+      setLoading(true)
       try {
         const response = await fetch(`/api/search?q=${encodeURIComponent(term)}`, { signal: controller.signal })
         if (!response.ok) throw new Error('Search failed')
@@ -103,13 +106,13 @@ export function GlobalSearch() {
         <div className="absolute left-0 right-0 top-9 z-50 max-h-96 overflow-y-auto border border-line bg-surface shadow-sm">
           {loading ? (
             <p className="px-3 py-3 text-[12px] text-ink-muted">Searching…</p>
-          ) : results.length === 0 ? (
+          ) : visible.length === 0 ? (
             <p className="px-3 py-3 text-[12px] text-ink-muted">
               Nothing matched “{query.trim()}” that you have access to.
             </p>
           ) : (
             <ul>
-              {results.map((result) => (
+              {visible.map((result) => (
                 <li key={`${result.kind}-${result.id}`}>
                   <Link
                     href={result.href}

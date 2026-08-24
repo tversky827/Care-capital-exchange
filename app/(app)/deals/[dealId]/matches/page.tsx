@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
 import { db } from '@/db'
 import { subjectOf } from '@/lib/access'
 import { canDistributeDeal } from '@/lib/policy'
@@ -28,6 +29,8 @@ const BAND_TONE: Record<string, Tone> = {
  */
 export default async function MatchesPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const actor = await requireActor()
 
   const store = await db()

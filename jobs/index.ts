@@ -6,6 +6,7 @@ import { runUnderwriting } from '@/services/underwriting'
 import { computeMatches } from '@/services/matching'
 import { runLenderAlerts } from '@/services/lenders'
 import { fulfilDataRequests } from '@/services/messages'
+import { advanceDealStatus } from '@/services/deals'
 import { db } from '@/db'
 
 /**
@@ -36,16 +37,20 @@ registerJobHandler('document.process', async (payload) => {
   // metric a lender is matched on.
   await runReconciliation(document.deal_id)
   await computeMatches(document.deal_id, { explain: false })
+  await advanceDealStatus(document.deal_id)
 })
 
 registerJobHandler('deal.reconcile', async (payload) => {
-  await runReconciliation(String(payload.dealId))
+  const dealId = String(payload.dealId)
+  await runReconciliation(dealId)
+  await advanceDealStatus(dealId)
 })
 
 registerJobHandler('deal.underwrite', async (payload) => {
   const dealId = String(payload.dealId)
   await runUnderwriting(dealId, { force: Boolean(payload.force) })
   await computeMatches(dealId)
+  await advanceDealStatus(dealId)
 })
 
 registerJobHandler('deal.match', async (payload) => {

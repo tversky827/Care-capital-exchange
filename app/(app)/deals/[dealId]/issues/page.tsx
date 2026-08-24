@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
 import { db } from '@/db'
 import { subjectOf } from '@/lib/access'
 import { canEditDeal } from '@/lib/policy'
@@ -20,6 +21,8 @@ import { formatRelative, titleize } from '@/lib/utils/format'
  */
 export default async function IssuesPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   const actor = await requireActor()
 
   const store = await db()
@@ -168,7 +171,7 @@ export default async function IssuesPage({ params }: { params: Promise<{ dealId:
                       <Badge tone={item.status === 'resolved' ? 'positive' : 'neutral'}>{titleize(item.status)}</Badge>
                     </Td>
                     <Td className="text-ink-muted">
-                      {resolution ? userName.get(resolution.resolved_by) ?? 'Platform' : '—'}
+                      {resolution?.resolved_by ? userName.get(resolution.resolved_by) ?? 'Unknown' : resolution ? 'Closed automatically' : '—'}
                     </Td>
                     <Td className="max-w-72 truncate text-[12px] text-ink-muted">{resolution?.resolution_note ?? '—'}</Td>
                   </Tr>

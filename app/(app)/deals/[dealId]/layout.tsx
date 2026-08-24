@@ -32,6 +32,9 @@ export default async function DealLayout({
   // which shows only what they are entitled to see.
   if (actor.isLender) redirect(`/lender/deals/${dealId}`)
 
+  // When access is denied the layout renders no deal chrome at all, so nothing
+  // about the deal can appear around the page's not-found boundary. The page
+  // itself produces the 404 — see `requireDealAccess`.
   try {
     await loadDealForActor(actor, dealId)
   } catch (error) {
@@ -39,8 +42,10 @@ export default async function DealLayout({
     throw error
   }
 
-  const [snapshot, readiness] = await Promise.all([buildSnapshot(dealId), readinessFor(dealId)])
+  const snapshot = await buildSnapshot(dealId)
   if (!snapshot) notFound()
+
+  const readiness = await readinessFor(dealId)
 
   const store = await db()
   const [openIssues, matchCount, indicationCount, unreadThreads] = await Promise.all([

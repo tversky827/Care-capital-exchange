@@ -399,22 +399,23 @@ async function seed(store: Store): Promise<void> {
     const actor = await resolveActor(owner.id, company.id)
     if (!actor) continue
 
-    // On deals that have gone to market, the borrower has already worked
-    // through the blocking items — which is what made them distributable. The
-    // deals still in preparation keep their open items, so the discrepancy
-    // centre and the extraction review queue have genuine content.
+    // Approve the figures extraction proposed, as a borrower working through
+    // the review queue would. This is the human half of the approval rule, and
+    // it writes the same audit trail a real approval writes.
+    const { approveLineItem } = await import('@/services/deals')
+    const pendingItems = await store.select('financial_line_items', {
+      where: { deal_id: deal.id, approved_value: null },
+    })
+    for (const item of pendingItems) {
+      if (item.proposed_value === null) continue
+      await approveLineItem(actor, item.id, item.proposed_value)
+    }
+
+    // Only the deals that actually went to market had their blocking items
+    // worked through — that is what made them distributable. The deals still in
+    // preparation keep their open items, so the discrepancy centre demonstrates
+    // real content rather than an empty state.
     if (fixture.status === 'distributed' || fixture.status === 'indications') {
-      // Approve the figures extraction proposed, as a borrower reviewing the
-      // extraction queue would. This is the human half of the approval rule,
-      // and it writes the same audit trail a real approval writes.
-      const { approveLineItem } = await import('@/services/deals')
-      const pending = await store.select('financial_line_items', {
-        where: { deal_id: deal.id, approved_value: null },
-      })
-      for (const item of pending) {
-        if (item.proposed_value === null) continue
-        await approveLineItem(actor, item.id, item.proposed_value)
-      }
 
       const open = await store.select('discrepancies', { where: { deal_id: deal.id, status: 'open' } })
       for (const discrepancy of open) {

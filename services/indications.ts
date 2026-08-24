@@ -7,7 +7,7 @@ import { buildSnapshot } from '@/lib/deal/snapshot'
 import { dscr } from '@/lib/finance/calculations'
 import { recordAudit } from './audit'
 import { notify } from './notifications'
-import { transitionDeal } from './deals'
+import { systemTransition } from './deals'
 import type { Actor } from '@/lib/auth/session'
 import type { BorrowerPriority, Indication, IndicationCondition, Lender } from '@/types'
 
@@ -147,13 +147,14 @@ export async function submitIndication(
     href: `/deals/${dealId}/indications`,
   })
 
-  if (deal.status === 'distributed') {
-    await transitionDeal(actor, dealId, 'indications_received', 'First financing indication received.').catch(
-      // The borrower's deal status is not this lender's to enforce; a failed
-      // transition must not roll back their indication.
-      () => undefined,
-    )
-  }
+  // The lender has no authority over the borrower's deal, but their submission
+  // legitimately advances it, so this goes through the system path.
+  await systemTransition(
+    dealId,
+    'indications_received',
+    `Financing indication received from ${actor.lender!.institution_name}.`,
+    actor,
+  ).catch(() => undefined)
 
   return indication
 }
@@ -245,7 +246,7 @@ export async function selectIndication(actor: Actor, indicationId: string, note?
     metadata: { loanAmount: indication.loan_amount, rate: indication.all_in_rate_pct, note: note ?? null },
   })
 
-  await transitionDeal(actor, deal.id, 'diligence', 'Preferred indication selected.')
+  await systemTransition(deal.id, 'diligence', 'Preferred indication selected; deal moved to diligence.', actor)
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireActor } from '@/lib/auth/session'
-import { loadDealForActor, subjectOf } from '@/lib/access'
+import { loadDealForActor } from '@/lib/access'
 import { authorize, canDistributeDeal, canEditDeal, ForbiddenError } from '@/lib/policy'
 import {
   approveLineItem, createDeal, transitionDeal, updateFacility, updateSponsor, updateTerms,
@@ -14,7 +14,7 @@ import { runUnderwriting } from '@/services/underwriting'
 import { generateCreditMemo, saveMemoEdit } from '@/services/memo'
 import { computeMatches } from '@/services/matching'
 import { distributeDeal, revokeDistribution } from '@/services/distribution'
-import { compareIndications, selectIndication } from '@/services/indications'
+import { selectIndication } from '@/services/indications'
 import { createDataRequests, openThread, postMessage } from '@/services/messages'
 import { askDeal } from '@/services/chat'
 import { enqueue } from '@/services/jobs'

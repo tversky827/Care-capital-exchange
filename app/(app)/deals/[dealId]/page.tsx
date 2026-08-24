@@ -2,11 +2,13 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { requireDealAccess } from '@/lib/deal-access'
+
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { latestRun, readinessFor } from '@/services/underwriting'
 import { scoreBand } from '@/lib/underwriting/score'
 import {
-  Badge, Card, CardBody, CardHeader, CardTitle, DefinitionList, Section, Table, Td, Th, Tr,
+  Card, CardBody, CardHeader, CardTitle, DefinitionList, Section, Table, Td, Tr,
 } from '@/components/ui/primitives'
 import { BarChart, DonutChart, ScoreRing } from '@/components/charts'
 import { MetricTile, NextAction, ReadinessBar, SeverityBadge } from '@/components/deal/common'
@@ -15,6 +17,8 @@ import { priorityLabel } from '@/services/indications'
 
 export default async function DealOverviewPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
+  // Authorizes and produces a 404 the framework reports correctly.
+  await requireDealAccess(dealId)
   await requireActor()
 
   const snapshot = await buildSnapshot(dealId)

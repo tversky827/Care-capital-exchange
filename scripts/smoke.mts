@@ -21,6 +21,8 @@ interface Check {
   path: string
   expect?: string
   allow?: number[]
+  /** Text that must NOT appear — used to assert nothing leaked. */
+  absent?: string
 }
 
 async function cookieFor(email: string): Promise<string> {
@@ -53,7 +55,9 @@ async function run(label: string, cookie: string | null, checks: Check[]): Promi
 
     const allowed = check.allow ?? [200]
     const statusOk = allowed.includes(status)
-    const contentOk = !check.expect || body.includes(check.expect)
+    const contentOk =
+      (!check.expect || body.includes(check.expect)) &&
+      (!check.absent || !body.includes(check.absent))
     const ms = Date.now() - started
 
     if (statusOk && contentOk) {
@@ -75,11 +79,25 @@ async function run(label: string, cookie: string | null, checks: Check[]): Promi
 
 async function main(): Promise<void> {
   const store = await db()
-  const deals = await store.select('deals', { orderBy: { field: 'reference' } })
+  // Scope the borrower fixtures to one company: a deal belonging to a different
+  // borrower is correctly a 404, which would otherwise read as a failure.
+  const borrowerUser = await store.selectOne('users', { where: { email: 'dana@meridiansenior.demo' } })
+  const borrowerMembership = await store.selectOne('company_members', { where: { user_id: borrowerUser!.id } })
+  const deals = await store.select('deals', {
+    where: { company_id: borrowerMembership!.company_id },
+    orderBy: { field: 'reference' },
+  })
   const withIndications = deals.find((d) => d.status === 'indications_received')
   const ready = deals.find((d) => d.status === 'ready_for_distribution')
   const draft = deals.find((d) => d.status === 'draft')
   const dealId = withIndications?.id ?? deals[0]!.id
+  const foreignDeal = (await store.select('deals', {})).find(
+    (d) => d.company_id !== borrowerMembership!.company_id,
+  )
+  const foreignDealId = foreignDeal?.id
+  const foreignFacilityName = foreignDeal
+    ? (await store.selectOne('facilities', { where: { deal_id: foreignDeal.id } }))?.name
+    : undefined
   const lenders = await store.select('lenders', {})
   const lenderId = lenders[0]!.id
   const distribution = await store.selectOne('deal_distributions', { where: { deal_id: dealId } })
@@ -133,6 +151,12 @@ async function main(): Promise<void> {
     { path: '/settings', expect: 'Settings' },
     { path: `/lenders/${lenderId}`, expect: 'lending' },
     { path: '/api/search?q=lake', expect: 'results' },
+    // A deal belonging to another borrower must render the not-found page and
+    // must not disclose anything about the deal. Next.js reports an in-app
+    // notFound() as 200, so the assertion is on content, not status.
+    ...(foreignDealId
+      ? [{ path: `/deals/${foreignDealId}`, allow: [200, 404], expect: 'Not found', absent: foreignFacilityName ?? '\u0000' }]
+      : []),
     ...(ready ? [{ path: `/deals/${ready.id}`, expect: 'Underwriting metrics' }] : []),
     ...(draft ? [{ path: `/deals/${draft.id}/documents`, expect: 'Data room' }] : []),
   ])
@@ -149,8 +173,9 @@ async function main(): Promise<void> {
       { path: '/lender/analytics', expect: 'nalytics' },
       { path: `/lender/deals/${dealId}`, expect: 'ndication' },
       { path: '/notifications', expect: 'Notifications' },
-      // A lender must never reach the borrower workspace.
-      { path: `/deals/${dealId}`, allow: [307, 302] },
+      // A lender must never reach the borrower workspace; they are routed to
+      // the lender deal room instead.
+      { path: `/deals/${dealId}`, allow: [307, 302, 200], absent: 'Ask the deal' },
     ])
   }
 

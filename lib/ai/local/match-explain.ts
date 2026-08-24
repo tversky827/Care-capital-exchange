@@ -8,11 +8,7 @@ import { BAND_LABELS, type MatchResult } from '@/lib/matching/engine'
  * lender will approve anything. It reports how the deal measures against the
  * criteria that lender has published, and nothing more.
  */
-export function explainMatch(
-  match: MatchResult,
-  lenderName: string,
-  context: { loanAmount: number | null; assetLabel: string; state: string },
-): MatchExplanationPayload {
+export function explainMatch(match: MatchResult, lenderName: string): MatchExplanationPayload {
   const passes = match.factors.filter((f) => f.status === 'pass')
 
   if (match.hardFail) {

@@ -43,6 +43,133 @@ export function canTransition(from: DealStatus, to: DealStatus): boolean {
   return from === to || (ALLOWED_TRANSITIONS[from] ?? []).includes(to)
 }
 
+/**
+ * Shortest legal route between two statuses.
+ *
+ * Automatic advancement moves a deal several steps at once — a deal at intake
+ * that has just had documents uploaded, analysed and packaged should end up at
+ * `ready_for_distribution`. Walking the graph rather than jumping keeps every
+ * intermediate state legal and each step auditable.
+ */
+export function transitionPath(from: DealStatus, to: DealStatus): DealStatus[] | null {
+  if (from === to) return []
+  const queue: DealStatus[][] = [[from]]
+  const seen = new Set<DealStatus>([from])
+  while (queue.length) {
+    const path = queue.shift()!
+    const current = path[path.length - 1]!
+    for (const next of ALLOWED_TRANSITIONS[current] ?? []) {
+      if (seen.has(next)) continue
+      const extended = [...path, next]
+      if (next === to) return extended.slice(1)
+      seen.add(next)
+      queue.push(extended)
+    }
+  }
+  return null
+}
+
+/**
+ * A status change caused by the workflow rather than by the actor's authority
+ * over the deal.
+ *
+ * A lender submitting an indication legitimately moves a borrower's deal from
+ * `distributed` to `indications_received`, but that lender has no right to edit
+ * the deal — so the change cannot go through `transitionDeal`. This validates
+ * the transition graph, walks any intermediate states, and records who caused
+ * it, without asserting edit permission the actor does not have.
+ */
+export async function systemTransition(
+  dealId: string,
+  to: DealStatus,
+  summary: string,
+  actor?: Actor | null,
+): Promise<Deal | null> {
+  const store = await db()
+  const deal = await store.findById('deals', dealId)
+  if (!deal || deal.status === to) return deal
+
+  const path = transitionPath(deal.status, to)
+  if (!path) return deal
+
+  let current = deal
+  for (const step of path) {
+    current = await store.update('deals', dealId, { status: step })
+  }
+
+  await recordAudit({
+    actor: actor ?? null,
+    action: 'deal.status_changed',
+    entityType: 'deal',
+    entityId: dealId,
+    dealId,
+    summary,
+    metadata: { from: deal.status, to, path, systemDriven: true },
+  })
+  return current
+}
+
+/**
+ * Statuses the borrower or a lender drives explicitly. Automatic advancement
+ * stops at `ready_for_distribution` and never touches a deal that has already
+ * gone to market — from there, humans and lender activity move it.
+ */
+const AUTOMATIC_CEILING: DealStatus[] = ['intake', 'document_collection', 'processing', 'underwriting', 'needs_attention', 'ready_for_distribution']
+
+/**
+ * Advances a deal to the furthest status its actual state justifies.
+ *
+ * Called after document processing, reconciliation, underwriting and memo
+ * generation. Without this a deal created in the wizard would sit at `intake`
+ * for ever while its package quietly became complete, which is both wrong on
+ * the dashboard and blocks the later transitions the workflow depends on.
+ */
+export async function advanceDealStatus(dealId: string, actor?: Actor | null): Promise<Deal | null> {
+  const store = await db()
+  const deal = await store.findById('deals', dealId)
+  if (!deal) return null
+  // Never override a status a person or a lender put the deal into.
+  if (!AUTOMATIC_CEILING.includes(deal.status)) return deal
+
+  const [documents, run, memo, blockingIssues, readiness] = await Promise.all([
+    store.count('documents', { where: { deal_id: dealId, deleted_at: { isNull: true } } }),
+    store.selectOne('underwriting_runs', { where: { deal_id: dealId, status: 'complete' } }),
+    store.selectOne('credit_memos', { where: { deal_id: dealId } }),
+    store.count('discrepancies', { where: { deal_id: dealId, status: 'open', severity: { in: ['critical', 'high'] } } }),
+    (await import('./underwriting')).readinessFor(dealId),
+  ])
+
+  let target: DealStatus
+  if (readiness?.canDistribute) target = 'ready_for_distribution'
+  else if (blockingIssues > 0) target = 'needs_attention'
+  else if (run && memo) target = 'underwriting'
+  else if (run) target = 'underwriting'
+  else if (documents > 0) target = 'document_collection'
+  else target = 'intake'
+
+  if (target === deal.status) return deal
+
+  const path = transitionPath(deal.status, target)
+  if (!path) return deal
+
+  let current = deal
+  for (const step of path) {
+    current = await store.update('deals', dealId, { status: step })
+  }
+
+  await recordAudit({
+    actor: actor ?? null,
+    action: 'deal.status_changed',
+    entityType: 'deal',
+    entityId: dealId,
+    dealId,
+    summary: `Status advanced from ${deal.status.replace(/_/g, ' ')} to ${target.replace(/_/g, ' ')} as the package progressed.`,
+    metadata: { from: deal.status, to: target, automatic: true, path },
+  })
+
+  return current
+}
+
 export interface CreateDealInput {
   actor: Actor
   name: string

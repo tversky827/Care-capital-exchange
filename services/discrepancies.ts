@@ -92,7 +92,8 @@ export async function runReconciliation(dealId: string): Promise<ReconcileOutcom
     await store.insert('discrepancy_resolutions', {
       discrepancy_id: record.id,
       deal_id: dealId,
-      resolved_by: record.deal_id,
+      // No user closed this one; the conflict simply stopped existing.
+      resolved_by: null,
       action: 'resolve',
       resolution_note: 'Closed automatically: the underlying data no longer conflicts.',
       accepted_value: null,
