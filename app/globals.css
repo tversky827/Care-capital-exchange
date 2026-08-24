@@ -1,0 +1,127 @@
+@import 'tailwindcss';
+
+/*
+ * CareCapital Exchange design tokens.
+ *
+ * The palette is deliberately narrow. An institutional financial interface
+ * earns confidence through typography, alignment and density — not colour — so
+ * colour is reserved for state (positive, warning, critical) and for a single
+ * accent used sparingly on primary actions and active navigation.
+ */
+@theme {
+  --color-canvas: #f8f8f6;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f2f2ef;
+  --color-surface-raised: #ffffff;
+
+  --color-ink: #14161a;
+  --color-ink-secondary: #4a5058;
+  --color-ink-muted: #767c85;
+  --color-ink-inverse: #ffffff;
+
+  --color-line: #e3e2dd;
+  --color-line-strong: #cfcec8;
+
+  --color-accent: #1f4e79;
+  --color-accent-hover: #17395a;
+  --color-accent-soft: #eaf1f8;
+  --color-accent-line: #c3d7ea;
+
+  --color-positive: #14714f;
+  --color-positive-soft: #e6f2ec;
+  --color-warning: #9a5b06;
+  --color-warning-soft: #fdf1e0;
+  --color-critical: #a32218;
+  --color-critical-soft: #fbeceb;
+  --color-neutral-soft: #eeeeea;
+
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /*
+   * Financial figures are set in tabular numerals everywhere so columns of
+   * numbers align on the decimal without extra markup.
+   */
+  .tnum,
+  table td,
+  table th {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.011em;
+    font-weight: 600;
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+
+  /* A restrained scrollbar; the default is visually loud in dense tables. */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border: 3px solid var(--color-canvas);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-ink-muted); }
+}
+
+@layer components {
+  /* Small-caps section eyebrow used above dense data blocks. */
+  .eyebrow {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-muted);
+  }
+
+  .data-grid {
+    display: grid;
+    gap: 1px;
+    background: var(--color-line);
+    border: 1px solid var(--color-line);
+  }
+
+  .data-grid > * {
+    background: var(--color-surface);
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; font-size: 11px; }
+  .print-block { break-inside: avoid; }
+}
