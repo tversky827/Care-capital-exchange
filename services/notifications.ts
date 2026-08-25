@@ -32,6 +32,16 @@ export type NotificationEvent =
   | 'closing.approaching'
   | 'message.received'
   | 'lender.verified'
+  // --- equity marketplace ---------------------------------------------------
+  | 'offering.matched'
+  | 'offering.opened'
+  | 'offering.closing_soon'
+  | 'offering.document_added'
+  | 'investor.verification_required'
+  | 'investment.status_changed'
+  | 'investor.update_published'
+  | 'distribution.posted'
+  | 'tax_document.available'
 
 const SEVERITY: Record<NotificationEvent, Notification['severity']> = {
   'deal.created': 'info',
@@ -53,6 +63,15 @@ const SEVERITY: Record<NotificationEvent, Notification['severity']> = {
   'closing.approaching': 'warning',
   'message.received': 'info',
   'lender.verified': 'success',
+  'offering.matched': 'info',
+  'offering.opened': 'info',
+  'offering.closing_soon': 'warning',
+  'offering.document_added': 'info',
+  'investor.verification_required': 'warning',
+  'investment.status_changed': 'info',
+  'investor.update_published': 'info',
+  'distribution.posted': 'success',
+  'tax_document.available': 'info',
 }
 
 export interface EmailMessage {

@@ -138,3 +138,48 @@ export const dataRequestListSchema = z.object({
     .max(40),
 })
 export type DataRequestList = z.infer<typeof dataRequestListSchema>
+
+// ---------------------------------------------------------------------------
+// Equity marketplace
+// ---------------------------------------------------------------------------
+
+/**
+ * An investment analysis of an offering.
+ *
+ * Shaped so that a model cannot return a number the product would then quote:
+ * every figure an investor sees comes from the deterministic engines, and this
+ * schema carries only the qualitative reading around them.
+ */
+export const investmentAnalysisSchema = z.object({
+  thesis: z.string().max(2000),
+  strengths: z.array(z.string().max(400)).max(20),
+  risks: z.array(analysisRiskSchema).max(30),
+  key_assumptions: z.array(z.string().max(400)).max(20),
+  questions_to_ask: z.array(z.string().max(400)).max(20),
+  missing_information: z.array(z.string().max(400)).max(20),
+  downside_considerations: z.array(z.string().max(400)).max(20),
+  confidence: confidenceSchema,
+})
+
+export type InvestmentAnalysisPayload = z.infer<typeof investmentAnalysisSchema>
+
+/** A narrative bear case. The arithmetic beside it is computed, never generated. */
+export const bearCaseSchema = z.object({
+  narrative: z.string().max(2000),
+  drivers: z.array(z.object({
+    label: z.string().max(120),
+    detail: z.string().max(600),
+  })).max(12),
+  what_would_have_to_be_true: z.array(z.string().max(400)).max(12),
+})
+
+export type BearCasePayload = z.infer<typeof bearCaseSchema>
+
+/** A quarterly update drafted for a human to approve before investors see it. */
+export const investorUpdateSchema = z.object({
+  title: z.string().max(200),
+  body: z.string().max(6000),
+  highlights: z.array(z.string().max(300)).max(10),
+})
+
+export type InvestorUpdatePayload = z.infer<typeof investorUpdateSchema>
