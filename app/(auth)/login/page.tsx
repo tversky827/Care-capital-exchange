@@ -1,13 +1,22 @@
 import type { Metadata } from 'next'
 import { db } from '@/db'
 import { LoginForm } from './login-form'
+import { mailConfigured } from '@/services/email'
 
 export const metadata: Metadata = { title: 'Sign in' }
 
 /**
  * The demo account list is read from the database rather than hard-coded, so
  * it disappears automatically when demo seeding is turned off.
+ *
+ * Rendered per request rather than prerendered. This page reads both the
+ * database and the environment, so prerendering it would freeze the build
+ * machine's answers into the HTML — a deployment that turns demo sign-in off,
+ * or configures mail after the build, would still be served the state that was
+ * true when the bundle was compiled.
  */
+export const dynamic = 'force-dynamic'
+
 export default async function LoginPage() {
   const store = await db()
   const demoAccounts =
@@ -42,5 +51,8 @@ export default async function LoginPage() {
             })
         })()
 
-  return <LoginForm demoAccounts={demoAccounts} />
+  // Offering a sign-in link this deployment cannot deliver is worse than not
+  // offering one. In development the link is surfaced on screen instead.
+  const emailLinkEnabled = mailConfigured() || process.env.NODE_ENV !== 'production'
+  return <LoginForm demoAccounts={demoAccounts} emailLinkEnabled={emailLinkEnabled} />
 }

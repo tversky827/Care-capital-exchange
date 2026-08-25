@@ -15,7 +15,9 @@ interface DemoAccount {
   companyType: string
 }
 
-export function LoginForm({ demoAccounts }: { demoAccounts: DemoAccount[] }) {
+export function LoginForm({
+  demoAccounts, emailLinkEnabled,
+}: { demoAccounts: DemoAccount[]; emailLinkEnabled: boolean }) {
   const [mode, setMode] = useState<'password' | 'magic'>('password')
   const [passwordState, passwordSubmit, passwordPending] = useActionState<AuthState, FormData>(loginAction, {})
   const [magicState, magicSubmit, magicPending] = useActionState<AuthState, FormData>(magicLinkAction, {})
@@ -32,12 +34,14 @@ export function LoginForm({ demoAccounts }: { demoAccounts: DemoAccount[] }) {
             <TabButton active={mode === 'password'} onClick={() => setMode('password')} icon={<KeyRound className="size-3.5" />}>
               Password
             </TabButton>
-            <TabButton active={mode === 'magic'} onClick={() => setMode('magic')} icon={<Mail className="size-3.5" />}>
-              Email link
-            </TabButton>
+            {emailLinkEnabled ? (
+              <TabButton active={mode === 'magic'} onClick={() => setMode('magic')} icon={<Mail className="size-3.5" />}>
+                Email link
+              </TabButton>
+            ) : null}
           </div>
 
-          {mode === 'password' ? (
+          {mode === 'password' || !emailLinkEnabled ? (
             <form action={passwordSubmit} className="mt-5 space-y-4">
               <Field label="Email" htmlFor="email">
                 <Input id="email" name="email" type="email" required autoComplete="email" autoFocus />
@@ -61,7 +65,8 @@ export function LoginForm({ demoAccounts }: { demoAccounts: DemoAccount[] }) {
                   {magicState.notice}
                   {magicState.magicLink ? (
                     <p className="mt-2">
-                      No mail transport is configured, so the link is shown here:{' '}
+                      Mail delivery is not configured in this environment, so the link is
+                      here for development:{' '}
                       <Link href={magicState.magicLink} className="break-all font-medium underline">
                         open sign-in link
                       </Link>

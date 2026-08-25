@@ -14,6 +14,13 @@ export interface AuthState {
   error?: string
   notice?: string
   magicLink?: string
+  /**
+   * What the person typed, echoed back so a rejected submission does not make
+   * them retype the whole form. React resets an uncontrolled form once its
+   * action resolves, so the values have to come back through state to survive.
+   * The password is deliberately never echoed.
+   */
+  values?: Record<string, string>
 }
 
 function landingFor(actor: Actor): string {
@@ -77,8 +84,15 @@ export async function verifyMagicLinkAction(token: string): Promise<{ error: str
 
 export async function registerAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const intent = String(formData.get('intent') ?? 'find_financing') as Intent
+  const values = {
+    intent,
+    fullName: String(formData.get('fullName') ?? ''),
+    title: String(formData.get('title') ?? ''),
+    companyName: String(formData.get('companyName') ?? ''),
+    email: String(formData.get('email') ?? ''),
+  }
   if (!['find_financing', 'provide_financing', 'manage_for_clients'].includes(intent)) {
-    return { error: 'Choose what you are here to do.' }
+    return { error: 'Choose what you are here to do.', values }
   }
 
   let destination: string
@@ -97,7 +111,10 @@ export async function registerAction(_prev: AuthState, formData: FormData): Prom
     // complete before the platform can do anything useful for them.
     destination = actor.isLender ? '/lender/box?welcome=1' : '/deals/new'
   } catch (error) {
-    return { error: error instanceof AuthFailure ? error.message : 'Registration failed. Please try again.' }
+    return {
+      error: error instanceof AuthFailure ? error.message : 'Registration failed. Please try again.',
+      values,
+    }
   }
   redirect(destination)
 }

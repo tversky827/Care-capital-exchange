@@ -2,11 +2,12 @@
   "name": "carecapital-exchange",
   "version": "0.1.0",
   "private": true,
-  "description": "CareCapital Exchange — healthcare capital, intelligently matched.",
+  "description": "CareCapital Exchange \u2014 healthcare capital, intelligently matched.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "demo": "next build && next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

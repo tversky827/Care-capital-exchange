@@ -74,8 +74,21 @@ class ConsoleEmailTransport implements EmailTransport {
   }
 }
 
-let transport: EmailTransport = new ConsoleEmailTransport()
+let transport: EmailTransport | null = null
 let suppressed = false
+
+/**
+ * Resolved on first use rather than at import, so the environment is read once
+ * the process is actually configured. A deployment with mail credentials gets
+ * real delivery; one without falls back to logging.
+ */
+async function activeTransport(): Promise<EmailTransport> {
+  if (!transport) {
+    const { resolveTransport } = await import('./email')
+    transport = resolveTransport() ?? new ConsoleEmailTransport()
+  }
+  return transport
+}
 
 export function setEmailTransport(next: EmailTransport): void {
   transport = next
@@ -134,14 +147,14 @@ export async function notify(input: NotifyInput): Promise<Notification[]> {
 
     if (preferences?.email !== false) {
       try {
-        await transport.send({
+        await (await activeTransport()).send({
           to: user.email,
           subject: input.title,
           body: `${input.body}${input.href ? `\n\nOpen: ${input.href}` : ''}`,
         })
         await store.update('notifications', notification.id, { emailed_at: new Date().toISOString() })
       } catch (error) {
-        log.error('email delivery failed', error, { event: input.event, transport: transport.name })
+        log.error('email delivery failed', error, { event: input.event, transport: transport?.name })
       }
     }
   }

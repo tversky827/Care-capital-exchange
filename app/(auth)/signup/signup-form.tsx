@@ -33,6 +33,8 @@ const INTENTS: { key: Intent; label: string; detail: string; icon: typeof Buildi
 export function SignupForm({ initialIntent }: { initialIntent: Intent }) {
   const [intent, setIntent] = useState<Intent>(initialIntent)
   const [state, submit, pending] = useActionState<AuthState, FormData>(registerAction, {})
+  // Restored after a rejected submission so nobody has to retype the form.
+  const kept = state.values ?? {}
 
   return (
     <Card className="w-full max-w-lg p-6">
@@ -81,10 +83,10 @@ export function SignupForm({ initialIntent }: { initialIntent: Intent }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Full name" htmlFor="fullName">
-            <Input id="fullName" name="fullName" required autoComplete="name" />
+            <Input id="fullName" name="fullName" required autoComplete="name" defaultValue={kept.fullName} />
           </Field>
           <Field label="Title" htmlFor="title">
-            <Input id="title" name="title" autoComplete="organization-title" />
+            <Input id="title" name="title" autoComplete="organization-title" defaultValue={kept.title} />
           </Field>
         </div>
 
@@ -92,11 +94,11 @@ export function SignupForm({ initialIntent }: { initialIntent: Intent }) {
           label={intent === 'provide_financing' ? 'Institution name' : 'Organisation name'}
           htmlFor="companyName"
         >
-          <Input id="companyName" name="companyName" required autoComplete="organization" />
+          <Input id="companyName" name="companyName" required autoComplete="organization" defaultValue={kept.companyName} />
         </Field>
 
         <Field label="Work email" htmlFor="email">
-          <Input id="email" name="email" type="email" required autoComplete="email" />
+          <Input id="email" name="email" type="email" required autoComplete="email" defaultValue={kept.email} />
         </Field>
 
         <Field
