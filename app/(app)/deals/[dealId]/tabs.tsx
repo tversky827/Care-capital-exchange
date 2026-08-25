@@ -14,8 +14,10 @@ const TABS = [
   { segment: 'issues', label: 'Issues', count: 'issues' as const },
   { segment: 'analysis', label: 'AI Analysis' },
   { segment: 'memo', label: 'Credit Memo' },
+  { segment: 'capital', label: 'Capital' },
   { segment: 'matches', label: 'Lender Matches', count: 'matches' as const },
   { segment: 'indications', label: 'Indications', count: 'indications' as const },
+  { segment: 'equity', label: 'Equity', count: 'offerings' as const },
   { segment: 'messages', label: 'Messages', count: 'messages' as const },
   { segment: 'activity', label: 'Activity' },
 ]
@@ -24,7 +26,10 @@ export function DealTabs({
   dealId, counts,
 }: {
   dealId: string
-  counts: { issues: number; matches: number; indications: number; messages: number; documents: number }
+  counts: {
+    issues: number; matches: number; indications: number; messages: number
+    documents: number; offerings: number
+  }
 }) {
   const pathname = usePathname()
   const base = `/deals/${dealId}`

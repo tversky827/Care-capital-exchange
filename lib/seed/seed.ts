@@ -582,4 +582,10 @@ async function seed(store: Store): Promise<void> {
       } as never)
     }
   }
+
+  // --- Equity marketplace ---------------------------------------------------
+  // Runs last: offerings attach to deals the debt seed has already created and
+  // processed, so an investor sees the same documents and figures a lender does.
+  const { seedEquityDemo } = await import('./equity-seed')
+  await seedEquityDemo(store, hashPassword)
 }

@@ -48,11 +48,12 @@ export default async function DealLayout({
   const readiness = await readinessFor(dealId)
 
   const store = await db()
-  const [openIssues, matchCount, indicationCount, unreadThreads] = await Promise.all([
+  const [openIssues, matchCount, indicationCount, unreadThreads, offeringCount] = await Promise.all([
     store.count('discrepancies', { where: { deal_id: dealId, status: 'open' } }),
     store.count('matches', { where: { deal_id: dealId, hard_fail: false } }),
     store.count('indications', { where: { deal_id: dealId, status: { in: ['submitted', 'updated', 'selected'] } } }),
     store.count('message_threads', { where: { deal_id: dealId, status: 'open' } }),
+    store.count('offerings', { where: { deal_id: dealId } }),
   ])
 
   const { deal, facility, summary } = snapshot
@@ -118,6 +119,7 @@ export default async function DealLayout({
           indications: indicationCount,
           messages: unreadThreads,
           documents: snapshot.documents.length,
+          offerings: offeringCount,
         }}
       />
 

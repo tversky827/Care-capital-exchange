@@ -2,8 +2,8 @@
 
 import type { LucideIcon } from 'lucide-react'
 import {
-  Activity, BarChart3, Building2, FileText, Gauge, LayoutDashboard, ListChecks, Search,
-  Settings, ShieldCheck, Store, Users, Wallet, Workflow,
+  Activity, BarChart3, Briefcase, Building2, FileText, Gauge, LayoutDashboard, ListChecks,
+  PieChart, Search, Settings, ShieldCheck, Sparkles, Store, Users, Wallet, Workflow,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -65,6 +65,7 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: '/admin', label: 'Overview', icon: Gauge },
       { href: '/admin/deals', label: 'Deals', icon: FileText },
       { href: '/admin/lenders', label: 'Lender verification', icon: ShieldCheck },
+      { href: '/admin/equity', label: 'Equity marketplace', icon: Briefcase, prefix: true },
       { href: '/admin/users', label: 'Users & companies', icon: Users },
     ],
   },
@@ -82,7 +83,33 @@ export const ADMIN_NAV: NavGroup[] = [
 
 export const SETTINGS_ITEM: NavItem = { href: '/settings', label: 'Settings', icon: Settings }
 
-export type NavRole = 'borrower' | 'lender' | 'admin'
+export const INVESTOR_NAV: NavGroup[] = [
+  {
+    label: 'Investing',
+    items: [
+      { href: '/investor/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/investments', label: 'Opportunities', icon: Store, prefix: true },
+      { href: '/investor/opportunities', label: 'Your matches', icon: Sparkles },
+    ],
+  },
+  {
+    label: 'Holdings',
+    items: [
+      { href: '/investor/portfolio', label: 'Portfolio', icon: Briefcase },
+      { href: '/investor/documents', label: 'Documents', icon: FileText },
+      { href: '/notifications', label: 'Notifications', icon: Activity },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { href: '/investor/profile', label: 'Investor profile', icon: PieChart },
+      { href: '/settings', label: 'Settings', icon: Settings },
+    ],
+  },
+]
+
+export type NavRole = 'borrower' | 'lender' | 'investor' | 'admin'
 
 /**
  * Nav groups are resolved on the client from a role key rather than being
@@ -92,5 +119,6 @@ export type NavRole = 'borrower' | 'lender' | 'admin'
 export function navForRole(role: NavRole): NavGroup[] {
   if (role === 'admin') return ADMIN_NAV
   if (role === 'lender') return LENDER_NAV
+  if (role === 'investor') return INVESTOR_NAV
   return BORROWER_NAV
 }

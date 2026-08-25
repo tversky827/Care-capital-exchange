@@ -17,7 +17,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const actor = await getActor()
   if (!actor) redirect('/login')
 
-  const role: NavRole = actor.isAdmin ? 'admin' : actor.isLender ? 'lender' : 'borrower'
+  const role: NavRole = actor.isAdmin
+    ? 'admin'
+    : actor.isLender ? 'lender' : actor.isInvestor ? 'investor' : 'borrower'
 
   const store = await db()
   const demoDeals = await store.count('deals', { where: { is_demo: true } })
