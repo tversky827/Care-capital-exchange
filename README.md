@@ -512,18 +512,30 @@ openssl rand -hex 32     # this is AUTH_SECRET
 
 **4. Load the demo data.** The application never seeds a remote database on its
 own — a serverless host runs many instances and they would race each other. Seed
-it once, deliberately, from your own machine:
+it once, deliberately, from your own machine.
+
+Put the four values in `.env.local` (gitignored, and read by the seed script):
+
+```
+DATA_DRIVER=supabase
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=YOUR-SERVICE-ROLE-KEY
+AUTH_SECRET=YOUR-GENERATED-SECRET
+```
+
+Then:
 
 ```bash
-DATA_DRIVER=supabase \
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=YOUR-SERVICE-ROLE-KEY \
-AUTH_SECRET=YOUR-GENERATED-SECRET \
 npm run seed
 ```
 
 It refuses to run against a database that already holds data, so it cannot
 quietly overwrite anything.
+
+This step is also where Supabase **Storage** is exercised for the first time:
+the seed uploads 82 documents. A failure here names the bucket and what to do
+about it — almost always that `0002_rls.sql`, which creates the bucket, has not
+been applied.
 
 **5. Deploy.** Import the repository at [vercel.com](https://vercel.com) and set
 these environment variables before the first build:

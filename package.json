@@ -12,8 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed": "tsx scripts/seed.mts",
-    "verify": "npm run typecheck && npm run lint && npm run test"
+    "seed": "tsx --conditions=react-server scripts/seed.mts",
+    "verify": "npm run typecheck && npm run lint && npm run test",
+    "smoke": "tsx --conditions=react-server scripts/smoke.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

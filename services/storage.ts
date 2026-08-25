@@ -78,13 +78,49 @@ class SupabaseStorageDriver implements StorageDriver {
     const { error } = await this.client.storage
       .from(this.bucket)
       .upload(key, data, { contentType, upsert: true })
-    if (error) throw new Error(`Storage upload failed: ${error.message}`)
+    if (error) throw new Error(this.describe('upload', error))
     return { key, size: data.length, checksum: checksumOf(data) }
+  }
+
+  /**
+   * A storage failure that says what to do about it.
+   *
+   * Supabase's storage errors frequently serialise to an empty object, so the
+   * message has to be assembled from whatever fields did arrive. The bucket is
+   * named because a missing bucket is much the commonest cause, and it is
+   * created by `0002_rls.sql` — a deployment that skipped that migration fails
+   * here first, with nothing else to point at.
+   */
+  private describe(operation: string, error: unknown): string {
+    const detail = error as { message?: unknown; error?: unknown; statusCode?: unknown } | null
+    // Only text that is actually informative. Supabase sometimes sets `message`
+    // to a stringified empty body, and "{}" in an error message is worse than
+    // saying nothing at all.
+    const EMPTY = new Set(['{}', '[]', 'null', 'undefined', '[object Object]'])
+    const text = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null
+      const trimmed = value.trim()
+      return trimmed.length > 0 && !EMPTY.has(trimmed) ? trimmed : null
+    }
+    const parts = [
+      text(detail?.message),
+      text(detail?.error),
+      detail?.statusCode !== undefined && detail.statusCode !== null
+        ? `status ${String(detail.statusCode)}`
+        : null,
+    ].filter((part): part is string => part !== null)
+
+    const reason = parts.length > 0 ? parts.join(' — ') : 'the storage service returned no detail'
+    return [
+      `Storage ${operation} failed for bucket "${this.bucket}": ${reason}.`,
+      `Check that the bucket exists and is private. It is created by supabase/migrations/0002_rls.sql;`,
+      `if that migration has not been applied, apply it or create the bucket by hand.`,
+    ].join(' ')
   }
 
   async get(key: string): Promise<Buffer> {
     const { data, error } = await this.client.storage.from(this.bucket).download(key)
-    if (error || !data) throw new Error(`Storage download failed: ${error?.message ?? 'not found'}`)
+    if (error || !data) throw new Error(this.describe('download', error))
     return Buffer.from(await data.arrayBuffer())
   }
 
