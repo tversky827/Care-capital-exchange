@@ -146,6 +146,10 @@ async function main(): Promise<void> {
     { path: `/deals/${dealId}/activity`, expect: 'ctivity' },
     { path: `/deals/${dealId}/distribute`, expect: 'istribut' },
     { path: `/deals/${dealId}/ask`, expect: 'Ask' },
+    { path: `/deals/${dealId}/capital`, expect: 'apitalisation' },
+    { path: `/deals/${dealId}/equity`, expect: 'quity' },
+    { path: `/deals/${dealId}/equity/new`, expect: 'Create an equity offering' },
+    { path: '/capital', expect: 'Debt and equity across your deals' },
     { path: '/analytics', expect: 'Analytics' },
     { path: '/notifications', expect: 'Notifications' },
     { path: '/settings', expect: 'Settings' },
@@ -180,6 +184,32 @@ async function main(): Promise<void> {
   }
 
   console.log('Admin routes')
+  // --- Investor -------------------------------------------------------------
+  // The equity marketplace has its own role, its own routes and its own
+  // navigation, so it needs its own pass. A dead link in this half is exactly
+  // what an earlier build shipped.
+  const investorUser = await store.selectOne('users', { where: { role: 'investor' } })
+  const liveOffering = await store.selectOne('offerings', { where: { status: 'live' } })
+  if (investorUser) {
+    console.log('Investor routes')
+    const investor = await cookieFor(investorUser.email)
+    failures += await run('investor', investor, [
+      { path: '/investor/dashboard', expect: 'Portfolio overview' },
+      { path: '/investments', expect: 'Healthcare investment marketplace' },
+      { path: '/investor/opportunities', expect: 'Opportunities for you' },
+      { path: '/investor/portfolio', expect: 'Portfolio' },
+      { path: '/investor/documents', expect: 'Documents' },
+      { path: '/investor/profile', expect: 'Investor profile' },
+      { path: '/notifications', expect: 'Notifications' },
+      ...(liveOffering
+        ? [
+          { path: `/investments/${liveOffering.id}`, expect: 'Target raise' },
+          { path: `/investments/compare?ids=${liveOffering.id}`, expect: 'Choose offerings to compare' },
+        ]
+        : []),
+    ])
+  }
+
   const admin = await cookieFor('admin@carecapital.demo')
   failures += await run('admin', admin, [
     { path: '/admin', expect: 'arketplace' },

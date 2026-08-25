@@ -14,10 +14,13 @@ const TABS = [
   { segment: 'issues', label: 'Issues', count: 'issues' as const },
   { segment: 'analysis', label: 'AI Analysis' },
   { segment: 'memo', label: 'Credit Memo' },
+  // The two capital-raising tabs sit together: a sponsor thinking about the
+  // stack is thinking about both halves of it, and separating them pushed
+  // Equity off the end of the strip where nobody found it.
   { segment: 'capital', label: 'Capital' },
+  { segment: 'equity', label: 'Equity', count: 'offerings' as const },
   { segment: 'matches', label: 'Lender Matches', count: 'matches' as const },
   { segment: 'indications', label: 'Indications', count: 'indications' as const },
-  { segment: 'equity', label: 'Equity', count: 'offerings' as const },
   { segment: 'messages', label: 'Messages', count: 'messages' as const },
   { segment: 'activity', label: 'Activity' },
 ]

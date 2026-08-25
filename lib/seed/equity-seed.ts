@@ -717,6 +717,18 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
 
     void waterfallId
   }
+
+  // Score every investor against every published offering.
+  //
+  // The application does this when an administrator publishes, but the seed
+  // inserts offerings already live, so nothing has triggered it. Without this a
+  // sponsor opening their own raise is told nobody matched, when in fact ten
+  // investors do — the demo's own data contradicting the demo's own screen.
+  const { computeMatchesForOffering } = await import('@/services/equity/matching')
+  const published = await store.select('offerings', { where: { status: 'live' } })
+  for (const offering of published) {
+    await computeMatchesForOffering(offering.id)
+  }
 }
 
 async function seedDisclosures(store: Store, offeringId: string): Promise<void> {

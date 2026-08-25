@@ -31,6 +31,7 @@ export const BORROWER_NAV: NavGroup[] = [
   {
     label: 'Capital',
     items: [
+      { href: '/capital', label: 'Capital markets', icon: Briefcase },
       { href: '/lenders', label: 'Lender directory', icon: Building2, prefix: true },
       { href: '/notifications', label: 'Notifications', icon: Activity },
     ],
