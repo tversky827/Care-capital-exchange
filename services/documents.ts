@@ -21,7 +21,15 @@ import type { DocumentCategory, DocumentRecord, DocumentType } from '@/types'
  *     from the record, only withdrawn from view.
  */
 
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+/**
+ * Largest file the product will accept, in bytes.
+ *
+ * Configurable because the ceiling is usually the host's, not ours: Vercel's
+ * serverless functions reject a request body over 4.5MB before any of this
+ * code runs. Setting MAX_UPLOAD_MB to match the platform turns an opaque
+ * upload failure into a clear message about a file that is too large.
+ */
+export const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_MB || 25) * 1024 * 1024
 
 const CATEGORY_FOR_TYPE: Record<DocumentType, DocumentCategory> = {
   articles: 'corporate', operating_agreement: 'corporate', entity_chart: 'corporate',

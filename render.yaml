@@ -8,7 +8,7 @@
 # disk. On the free plan that disk is reset whenever the instance restarts, so
 # the demo data returns to its seeded state — fine for showing the product, not
 # for anything you need to keep. To make it durable, move to a paid instance
-# and attach a disk (see README, "Making demo data durable").
+# and attach a disk, pointing CCX_DATA_DIR at the mount path.
 services:
   - type: web
     name: carecapital-exchange

@@ -7,7 +7,10 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [],
   experimental: {
     // Uploaded documents can be large; allow generous server action payloads.
-    serverActions: { bodySizeLimit: '25mb' },
+    // Kept in step with MAX_UPLOAD_MB so the framework limit and the product's
+    // own limit cannot disagree. A host with a smaller ceiling of its own
+    // (Vercel rejects bodies over 4.5MB) still wins — set MAX_UPLOAD_MB to match.
+    serverActions: { bodySizeLimit: `${Number(process.env.MAX_UPLOAD_MB || 25)}mb` as `${number}mb` },
   },
   async headers() {
     return [

@@ -3,6 +3,18 @@ import type { Query, Where } from './query'
 import { APPEND_ONLY_TABLES, type TableName } from './tables'
 import { StoreError, type Insert, type Row, type Store } from './store'
 
+/** Rows requested per page when reading an unbounded result set. */
+const PAGE_SIZE = 1000
+
+/**
+ * `contains` is a literal substring match in the query language, but `%` and
+ * `_` are wildcards to LIKE. Escaping them keeps a facility called "Fifty% Co"
+ * from matching everything, and keeps both drivers answering identically.
+ */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`)
+}
+
 /**
  * Supabase driver. Uses the service-role key on the server so that the
  * application policy layer (`lib/policy.ts`) is the single authority on access
@@ -20,8 +32,12 @@ export class SupabaseStore implements Store {
     })
   }
 
-  private build(table: TableName, query?: Query) {
-    let builder = this.client.from(table).select('*')
+  private build(
+    table: TableName,
+    query?: Query,
+    options?: { count?: 'exact'; head?: boolean; stableOrder?: boolean },
+  ) {
+    let builder = this.client.from(table).select('*', options as { count?: 'exact'; head?: boolean })
     for (const [field, condition] of Object.entries(query?.where ?? {})) {
       if (condition === null) {
         builder = builder.is(field, null)
@@ -35,7 +51,7 @@ export class SupabaseStore implements Store {
         if ('lt' in condition) builder = builder.lt(field, condition.lt)
         if ('lte' in condition) builder = builder.lte(field, condition.lte)
         if ('in' in condition) builder = builder.in(field, condition.in)
-        if ('contains' in condition) builder = builder.ilike(field, `%${condition.contains}%`)
+        if ('contains' in condition) builder = builder.ilike(field, `%${escapeLike(String(condition.contains))}%`)
         if ('isNull' in condition) builder = condition.isNull ? builder.is(field, null) : builder.not(field, 'is', null)
         if ('arrayContains' in condition) builder = builder.contains(field, [condition.arrayContains])
       } else {
@@ -48,19 +64,47 @@ export class SupabaseStore implements Store {
         builder = builder.order(clause.field, { ascending: clause.dir !== 'desc' })
       }
     }
-    if (query?.limit !== undefined) {
-      const offset = query.offset ?? 0
-      builder = builder.range(offset, offset + query.limit - 1)
-    } else if (query?.offset) {
-      builder = builder.range(query.offset, query.offset + 999)
-    }
+    // Paging over an unordered result is not stable: PostgREST may return rows
+    // in a different order between requests, which would duplicate some rows
+    // and drop others. The primary key breaks every remaining tie.
+    if (options?.stableOrder) builder = builder.order('id', { ascending: true })
     return builder
   }
 
   async select<T extends TableName>(table: T, query?: Query): Promise<Row<T>[]> {
-    const { data, error } = await this.build(table, query)
-    if (error) throw new StoreError(`select ${table}: ${error.message}`)
-    return (data ?? []) as Row<T>[]
+    if (query?.limit !== undefined) {
+      const offset = query.offset ?? 0
+      const { data, error } = await this.build(table, query).range(offset, offset + query.limit - 1)
+      if (error) throw new StoreError(`select ${table}: ${error.message}`)
+      return (data ?? []) as Row<T>[]
+    }
+
+    // No caller-supplied limit means "every matching row". PostgREST applies a
+    // server-side ceiling (hosted Supabase defaults to 1000) and truncates
+    // silently rather than erroring, so an unpaged read would quietly return a
+    // wrong answer — a short count of deals or line items, with nothing to
+    // indicate the rest existed. Page until the exact total is in hand.
+    const start = query?.offset ?? 0
+    const first = await this.build(table, query, { count: 'exact', stableOrder: true }).range(start, start + PAGE_SIZE - 1)
+    if (first.error) throw new StoreError(`select ${table}: ${first.error.message}`)
+
+    const rows = (first.data ?? []) as Row<T>[]
+    const total = (first.count ?? rows.length) - start
+    // The server may cap a page below what was asked for; take the first page's
+    // size as the real page size rather than assuming our own.
+    const pageSize = rows.length
+    if (pageSize === 0 || rows.length >= total) return rows
+
+    let offset = start + pageSize
+    while (rows.length < total) {
+      const next = await this.build(table, query, { stableOrder: true }).range(offset, offset + pageSize - 1)
+      if (next.error) throw new StoreError(`select ${table}: ${next.error.message}`)
+      const page = (next.data ?? []) as Row<T>[]
+      if (page.length === 0) break
+      rows.push(...page)
+      offset += page.length
+    }
+    return rows
   }
 
   async selectOne<T extends TableName>(table: T, query: Query): Promise<Row<T> | null> {
@@ -105,8 +149,21 @@ export class SupabaseStore implements Store {
   }
 
   async count<T extends TableName>(table: T, query?: Query): Promise<number> {
-    const rows = await this.select(table, { ...query, limit: undefined, offset: undefined })
-    return rows.length
+    // Counted by the database. Counting fetched rows would inherit the
+    // server-side row ceiling and report it as the total.
+    const { count, error, status } = await this.build(
+      table,
+      { ...query, limit: undefined, offset: undefined, orderBy: undefined },
+      { count: 'exact', head: true },
+    )
+    if (error) throw new StoreError(`count ${table}: ${error.message}`)
+    // A HEAD request carries no body, so a failed one can come back with
+    // neither an error nor a count. Reporting that as 0 would turn a broken
+    // query into a plausible-looking answer; refuse to guess.
+    if (typeof count !== 'number') {
+      throw new StoreError(`count ${table}: no count returned (status ${status})`)
+    }
+    return count
   }
 
   async reset(): Promise<void> {

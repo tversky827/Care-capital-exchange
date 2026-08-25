@@ -112,10 +112,18 @@ export function getStorage(): StorageDriver {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'deal-documents'
-  driver =
-    process.env.DATA_DRIVER === 'supabase' && url && key
-      ? new SupabaseStorageDriver(url, key, bucket)
-      : new LocalStorageDriver()
+  // Where documents live is a separate decision from where rows live. It
+  // defaults to following the data driver, which is what a normal Supabase
+  // deployment wants, but STORAGE_DRIVER can pin it either way — useful for
+  // keeping bytes on disk while the database is remote, and for exercising the
+  // Supabase data path against a stack that has no object storage.
+  const configured = process.env.STORAGE_DRIVER
+  const useSupabase =
+    configured === 'supabase' ||
+    (configured !== 'local' && process.env.DATA_DRIVER === 'supabase')
+  driver = useSupabase && url && key
+    ? new SupabaseStorageDriver(url, key, bucket)
+    : new LocalStorageDriver()
   return driver
 }
 
