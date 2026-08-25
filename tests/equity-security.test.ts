@@ -304,3 +304,49 @@ describe('eligibility cannot be bypassed', () => {
     await setOfferingStatus(admin, offering.id, 'live', 'Restoring')
   })
 })
+
+describe('records reference the entities their columns name', () => {
+  /**
+   * The local store has no foreign keys, so a column holding the wrong kind of
+   * id passes silently there and fails only against PostgreSQL. This checks the
+   * references the equity tables actually declare, which is what caught a
+   * company id sitting in a user column in the demo seed.
+   */
+  it('points every equity foreign key at a row of the right kind', async () => {
+    const [users, investors, offerings, disclosures] = await Promise.all([
+      store.select('users'),
+      store.select('investor_profiles'),
+      store.select('offerings'),
+      store.select('offering_disclosures'),
+    ])
+    const userIds = new Set(users.map((u) => u.id))
+    const investorIds = new Set(investors.map((i) => i.id))
+    const offeringIds = new Set(offerings.map((o) => o.id))
+    const disclosureIds = new Set(disclosures.map((d) => d.id))
+
+    const acknowledgements = await store.select('disclosure_acknowledgements')
+    expect(acknowledgements.length).toBeGreaterThan(0)
+    for (const record of acknowledgements) {
+      expect(userIds.has(record.user_id)).toBe(true)
+      expect(investorIds.has(record.investor_id)).toBe(true)
+      expect(offeringIds.has(record.offering_id)).toBe(true)
+      expect(disclosureIds.has(record.disclosure_id)).toBe(true)
+    }
+
+    for (const commitment of await store.select('investment_commitments')) {
+      expect(investorIds.has(commitment.investor_id)).toBe(true)
+      expect(offeringIds.has(commitment.offering_id)).toBe(true)
+      if (commitment.accepted_by) expect(userIds.has(commitment.accepted_by)).toBe(true)
+    }
+
+    for (const position of await store.select('investment_positions')) {
+      expect(investorIds.has(position.investor_id)).toBe(true)
+      expect(offeringIds.has(position.offering_id)).toBe(true)
+    }
+
+    for (const offering of offerings) {
+      expect(userIds.has(offering.created_by)).toBe(true)
+      if (offering.published_by) expect(userIds.has(offering.published_by)).toBe(true)
+    }
+  })
+})

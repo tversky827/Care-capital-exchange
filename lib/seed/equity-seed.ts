@@ -334,6 +334,9 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
   const passwordHash = await hashPassword('DemoPass123!')
   const now = new Date().toISOString()
   const profiles = new Map<string, InvestorProfile>()
+  // The acknowledging user, kept alongside the profile: an acknowledgement is
+  // evidence that a person accepted specific words, so it references a person.
+  const investorUsers = new Map<string, string>()
 
   // --- investors -----------------------------------------------------------
   for (const fixture of INVESTORS) {
@@ -369,6 +372,7 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
       status: 'active',
     } as Omit<InvestorProfile, 'id' | 'created_at' | 'updated_at'>)
     profiles.set(fixture.slug, profile)
+    investorUsers.set(fixture.slug, user.id)
 
     await store.insert('investor_preferences', {
       investor_id: profile.id,
@@ -571,7 +575,8 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
     const positions = new Map<string, InvestmentPosition>()
     for (const entry of fixture.commitments) {
       const profile = profiles.get(entry.investor)
-      if (!profile) continue
+      const acknowledgingUser = investorUsers.get(entry.investor)
+      if (!profile || !acknowledgingUser) continue
       const interest = await store.selectOne('investment_interests', {
         where: { offering_id: offering.id, investor_id: profile.id },
       })
@@ -583,7 +588,7 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
           offering_id: offering.id,
           disclosure_id: disclosure.id,
           investor_id: profile.id,
-          user_id: profile.company_id,
+          user_id: acknowledgingUser,
           disclosure_version: disclosure.version,
           acknowledged_at: now,
           ip_address: null,
