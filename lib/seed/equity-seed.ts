@@ -1,4 +1,6 @@
 import type { Store } from '@/db'
+import { buildSnapshot } from '@/lib/deal/snapshot'
+import { project } from '@/lib/equity/projections'
 import { defaultTiers } from '@/lib/equity/waterfall'
 import { ownershipShare } from '@/lib/equity/returns'
 import { round } from '@/lib/finance/calculations'
@@ -411,6 +413,28 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
     const creator = await store.selectOne('company_members', { where: { company_id: deal.company_id } })
     if (!creator) continue
 
+    // Exit assumptions are derived from each deal's own going-in economics
+    // rather than taken from the fixture. A demo that quietly assumes
+    // capitalisation-rate compression produces returns no real skilled nursing
+    // deal earns, and a marketplace whose demo numbers are not defensible is
+    // worse than one with no demo at all.
+    const snapshot = await buildSnapshot(deal.id)
+    const purchasePrice = snapshot?.terms?.purchase_price ?? null
+    const noi = snapshot?.summary.noi ?? null
+    const ebitda = snapshot?.latest?.items.ebitda ?? null
+
+    let exitCapRatePct = fixture.exitCapRatePct
+    let exitMultiple = fixture.exitMultiple
+    if (exitCapRatePct !== null && noi !== null && purchasePrice !== null && purchasePrice > 0) {
+      const goingInCapPct = (noi / purchasePrice) * 100
+      // Exit slightly softer than entry: the conservative direction.
+      exitCapRatePct = round(Math.max(exitCapRatePct, goingInCapPct + 0.25), 2)
+    }
+    if (exitMultiple !== null && ebitda !== null && purchasePrice !== null && ebitda > 0) {
+      const goingInMultiple = purchasePrice / ebitda
+      exitMultiple = round(Math.min(exitMultiple, goingInMultiple - 0.25), 2)
+    }
+
     const accepted = fixture.commitments.filter((c) => c.accepted)
     const committed = round(accepted.reduce((sum, c) => sum + c.amount, 0), 2)
     const isPublished = ['live', 'fully_subscribed', 'paused', 'closed'].includes(fixture.status)
@@ -455,8 +479,8 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
       disposition_fee_pct: 0.01,
       assumptions: {
         hold_years: fixture.holdYears,
-        exit_cap_rate_pct: fixture.exitCapRatePct,
-        exit_multiple_of_ebitda: fixture.exitMultiple,
+        exit_cap_rate_pct: exitCapRatePct,
+        exit_multiple_of_ebitda: exitMultiple,
         revenue_growth_pct: fixture.revenueGrowthPct,
         expense_growth_pct: fixture.expenseGrowthPct,
         occupancy_stabilized_pct: 89,
@@ -465,6 +489,39 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
         notes: 'Illustrative assumptions for a demonstration offering.',
       },
     } as Omit<OfferingTerms, 'id' | 'created_at' | 'updated_at'>)
+
+    // A sponsor's stated target comes from their model, so the demo derives it
+    // the same way rather than asserting a number the projection contradicts.
+    if (snapshot) {
+      const projected = project({
+        revenue: snapshot.latest?.items.revenue ?? null,
+        ebitda,
+        noi,
+        loanAmount: snapshot.summary.loanAmount,
+        ratePct: snapshot.assumedTerms.ratePct,
+        amortizationMonths: snapshot.assumedTerms.amortizationMonths,
+        interestOnlyMonths: snapshot.terms?.requested_io_months ?? 0,
+        investorEquity: fixture.targetRaise,
+        totalEquity: snapshot.summary.equityRequirement ?? fixture.targetRaise,
+        purchasePrice,
+        holdYears: fixture.holdYears,
+        revenueGrowthPct: fixture.revenueGrowthPct,
+        expenseGrowthPct: fixture.expenseGrowthPct,
+        exitCapRatePct,
+        exitMultipleOfEbitda: exitMultiple,
+        sellingCostsPct: fixture.sellingCostsPct,
+        preferredReturnPct: fixture.preferredReturnPct,
+      })
+      if (projected.irrPct !== null && projected.equityMultiple !== null) {
+        const terms = await store.selectOne('offering_terms', { where: { offering_id: offering.id } })
+        if (terms) {
+          await store.update('offering_terms', terms.id, {
+            target_irr_pct: round(projected.irrPct, 1),
+            target_equity_multiple: round(projected.equityMultiple, 2),
+          } as Partial<OfferingTerms>)
+        }
+      }
+    }
 
     await store.insert('offering_eligibility', {
       offering_id: offering.id,

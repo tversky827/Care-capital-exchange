@@ -1,11 +1,13 @@
 # CareCapital Exchange
 
-**Healthcare capital, intelligently matched.**
+**The capital markets platform for healthcare.**
 
-An institutional healthcare financing platform that turns a messy financing
-opportunity into a standardised, lender-ready package and matches it with
-lenders whose published criteria actually fit the deal. The first vertical is
-skilled nursing.
+An institutional healthcare capital platform. It turns a messy financing
+opportunity into a standardised, lender-ready package, then matches it with
+both sides of the market: lenders whose published criteria fit the deal, and
+private investors whose stated preferences fit the equity. One deal, one set of
+documents, one underwriting — debt and equity on top of it. The first vertical
+is skilled nursing.
 
 The application runs end to end with **no configuration and no external
 credentials**. `npm install && npm run dev` gives you a seeded marketplace with
@@ -25,6 +27,7 @@ pipeline has processed, and a complete borrower-to-lender workflow.
 - [Seed data](#seed-data)
 - [AI provider setup](#ai-provider-setup)
 - [Local development](#local-development)
+- [The equity marketplace](#the-equity-marketplace)
 - [Testing](#testing)
 - [Publishing a demo](#publishing-a-demo)
 - [Production deployment](#production-deployment)
@@ -206,6 +209,7 @@ what you need.
 | `RESEND_API_KEY`, `EMAIL_FROM` | Email delivery. Both unset => delivery is logged and the sign-in-link tab is hidden in production |
 | `SENTRY_DSN`, `NEXT_PUBLIC_POSTHOG_KEY` | Observability |
 | `SEED_DEMO_DATA` | `false` disables demo seeding and one-click demo sign-in |
+| `EQUITY_MARKETPLACE_ENABLED` and the other equity flags | See [The equity marketplace](#the-equity-marketplace) |
 | `CCX_DATA_DIR` | Where the local file store writes. Defaults to `.data`; point it at a mounted disk to survive restarts |
 
 Never commit secrets. `.env.local` is gitignored.
@@ -240,6 +244,8 @@ AUTH_SECRET=<openssl rand -hex 32>
 | --- | --- |
 | `supabase/migrations/0001_init.sql` | Schema: 42 tables, enumerated types, constraints, indexes, `updated_at` triggers |
 | `supabase/migrations/0002_rls.sql` | Row level security on every table, plus the private storage bucket |
+| `supabase/migrations/0003_equity.sql` | The equity marketplace: 29 tables, the investor role, `updated_at` triggers |
+| `supabase/migrations/0004_equity_rls.sql` | Row level security for the equity tables, mirroring `lib/policy.ts` |
 
 Apply in order:
 
@@ -331,6 +337,111 @@ The local store lives in `.data/` (gitignored): `store.json` for records and
 
 ---
 
+## The equity marketplace
+
+The equity side sits **on top of** the deal infrastructure rather than beside
+it. An offering belongs to a deal; the facility, financials, documents and
+underwriting an investor reads are the same records a lender reads, filtered
+differently. There is no second deal system.
+
+```
+DEAL → UNDERWRITING → CAPITAL STACK → DEBT (lenders)   → indications
+                                    → EQUITY (investors) → commitments
+```
+
+### What it does
+
+**Offerings.** A sponsor raises equity against a deal, stating the structure,
+terms and the assumptions every projection rests on. A deterministic
+completeness check names each specific missing or inconsistent figure. A
+sponsor submits; **an administrator publishes**. Terms an investor has seen are
+never edited in place — a change writes a version.
+
+**Investors.** Nine-step onboarding, preferences that drive matching, and
+verification verdicts recorded from an external provider. Matching is
+deterministic and scored like the lender engine, with reasons and concerns
+shown side by side. An unstated preference scores half rather than zero, so
+silence is not read as rejection.
+
+**Eligibility.** One gate between an investor and an offering, re-checked from
+the database at every transition. Verdicts are `eligible`, `pending`,
+`needs_information` or `not_eligible`, each with the requirement behind it and
+what to do about it.
+
+**Economics.** IRR, equity multiple, cash-on-cash, exit valuation, projections
+over the hold, four scenario presets and a distribution waterfall — all
+deterministic, all tested, none of it produced by a language model. A missing
+input yields a named explanation and no figures at all.
+
+### Three rules the equity side is built around
+
+1. **Nothing here is a promise.** Fields named `target_*` and `projected_*` are
+   assumptions or derivations from them; `actual_*` figures are things that
+   happened. The interface never presents the first as the second, and the
+   words *guaranteed*, *safe*, *risk-free* and *approved* appear nowhere in
+   generated output.
+2. **The platform is not a broker-dealer.** A commitment is a recorded
+   intention. It becomes a securities transaction only where a provider is
+   configured *and* `INVESTMENT_TRANSACTIONS_ENABLED` is on. No implementation
+   in this repository moves money.
+3. **An investor's dealings are private from every other investor.** Amounts,
+   identities, questions, positions and distributions alike. A sponsor is told
+   how many investors matched, never which.
+
+### Feature flags
+
+Every capability is switchable, because what is lawful is a decision for
+counsel, not for engineering. Defaults are conservative: anything touching a
+securities transaction, real verification or money movement is **off** until a
+deployment turns it on.
+
+| Flag | Default | What it gates |
+| --- | --- | --- |
+| `EQUITY_MARKETPLACE_ENABLED` | on | The equity side as a whole |
+| `INVESTOR_ONBOARDING_ENABLED` | on | Investor registration and onboarding |
+| `INVESTMENT_COMMITMENTS_ENABLED` | on | Recording a commitment |
+| `INVESTMENT_TRANSACTIONS_ENABLED` | **off** | Handing a commitment to a provider |
+| `REG_CF_ENABLED` | **off** | Regulation Crowdfunding offerings |
+| `REG_D_ENABLED` | on | Regulation D 506(b) and 506(c) offerings |
+| `ACCREDITED_INVESTOR_VERIFICATION_ENABLED` | on | Accreditation checks |
+| `DISTRIBUTIONS_ENABLED` | on | Distribution schedules and statements |
+| `TAX_DOCUMENTS_ENABLED` | on | Tax document tracking |
+
+Set any of them to `false`, `0` or `off` in the environment to disable, or
+`true`, `1` or `on` to enable. Anything else is ignored rather than guessed at,
+so a typo cannot silently switch on a securities capability.
+
+### Regulated roles the platform does not perform
+
+Each has an interface and a development implementation that settles nothing:
+
+| Interface | Performed in production by |
+| --- | --- |
+| `InvestorVerificationService` | Persona, Alloy, Parallel Markets, Jumio or similar |
+| `InvestmentTransactionService` | A registered broker-dealer or funding portal |
+| `CustodianService` | A qualified custodian |
+| `TransferAgentService` | A registered transfer agent |
+| `BrokerDealerService`, `FundingPortalService` | The respective registered firm |
+
+### Unresolved legal questions
+
+The software is built to **support** a compliant offering. It does not
+determine that any offering is compliant, and these remain open:
+
+- Which exemption each offering relies on, and whether the platform's role in
+  it requires broker-dealer or funding-portal registration.
+- Whether presenting matched offerings to an investor constitutes a
+  recommendation in any jurisdiction the platform operates in.
+- State-level blue-sky requirements, which the eligibility engine models as
+  configuration rather than encoding as rules.
+- Whether the platform's own compensation, if any, implicates transaction-based
+  compensation rules.
+
+These are questions for securities counsel. Nothing in this repository is legal
+advice.
+
+---
+
 ## Testing
 
 ```bash
@@ -386,10 +497,11 @@ Nothing else to configure. The rest of this section is the Vercel path.
 create a project and wait for it to finish provisioning.
 
 **2. Apply the schema.** In the Supabase dashboard open **SQL Editor**, paste
-the contents of `supabase/migrations/0001_init.sql`, run it, then do the same
-with `0002_rls.sql`. The second one also creates the private `deal-documents`
-storage bucket. Both have been applied to a stock PostgreSQL 16 and produce 42
-tables, 87 row-level-security policies and 18 `updated_at` triggers.
+each migration in `supabase/migrations/` in order — `0001_init.sql`,
+`0002_rls.sql`, `0003_equity.sql`, `0004_equity_rls.sql` — running each before
+pasting the next. `0002` also creates the private `deal-documents` storage
+bucket. All four have been applied to a stock PostgreSQL 16 and produce 71
+tables, 145 row-level-security policies and 40 `updated_at` triggers.
 
 **3. Collect four values** from **Project Settings → API**: the project URL,
 the `anon` key and the `service_role` key. Generate the fourth yourself:
