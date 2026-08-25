@@ -104,3 +104,13 @@ export async function attachLender(store: Store, actor: Actor): Promise<Actor> {
   const lender = await store.selectOne('lenders', { where: { company_id: actor.company.id } })
   return { ...actor, lender }
 }
+
+/**
+ * Re-reads the investor profile onto an actor. Onboarding advances the profile
+ * row, and an `Actor` captured before that still carries the old copy — the
+ * same refresh a new request would perform.
+ */
+export async function attachInvestor(store: Store, actor: Actor): Promise<Actor> {
+  const investor = await store.selectOne('investor_profiles', { where: { company_id: actor.company.id } })
+  return { ...actor, investor }
+}
