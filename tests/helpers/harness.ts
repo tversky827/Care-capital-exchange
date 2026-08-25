@@ -79,15 +79,22 @@ export async function createActor(store: Store, seed: ActorSeed): Promise<Actor>
       ? await store.selectOne('lenders', { where: { company_id: company.id } })
       : null
 
+  const investor =
+    seed.companyType === 'investor'
+      ? await store.selectOne('investor_profiles', { where: { company_id: company.id } })
+      : null
+
   return {
     user,
     company,
     membership,
     lender,
+    investor,
     isAdmin: seed.role === 'admin' || seed.companyType === 'admin',
     isLender: seed.companyType === 'lender',
     isBorrower: seed.companyType === 'borrower',
     isBroker: seed.companyType === 'broker',
+    isInvestor: company.type === 'investor',
     canWrite: (seed.memberRole ?? 'owner') !== 'viewer',
   }
 }

@@ -14,6 +14,7 @@ export function subjectOf(actor: Actor): PolicySubject {
     companyType: actor.company.type,
     memberRole: actor.membership.role,
     lenderId: actor.lender?.id ?? null,
+    investorId: actor.investor?.id ?? null,
     isAdmin: actor.isAdmin,
   }
 }

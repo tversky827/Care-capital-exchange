@@ -17,14 +17,19 @@
 import type {
   Deal, DealDistribution, DocumentRecord, Indication, LenderNote, MessageThread,
 } from '@/types'
+import type {
+  InvestmentStage, OfferingAccessLevel, OfferingStatus,
+} from '@/types/equity'
 
 /** The subset of an `Actor` that authorization actually depends on. */
 export interface PolicySubject {
   userId: string
   companyId: string
-  companyType: 'borrower' | 'lender' | 'broker' | 'admin'
+  companyType: 'borrower' | 'lender' | 'broker' | 'investor' | 'admin'
   memberRole: 'owner' | 'admin' | 'member' | 'viewer'
   lenderId: string | null
+  /** Present only when the actor's company is an investing organisation. */
+  investorId: string | null
   isAdmin: boolean
 }
 
@@ -246,4 +251,199 @@ export class ForbiddenError extends Error {
 /** Throws unless the condition holds. Keeps call sites to a single line. */
 export function authorize(allowed: boolean, message?: string): void {
   if (!allowed) throw new ForbiddenError(message)
+}
+
+// ---------------------------------------------------------------------------
+// Equity marketplace
+// ---------------------------------------------------------------------------
+
+/**
+ * Authorization for the equity side.
+ *
+ * Two rules shape all of it. An investor is a member of the public until an
+ * offering is published, and an investor's own dealings are private from every
+ * other investor — amounts, identities, questions and positions alike. The
+ * sponsor sees its own raise in aggregate and by investor; no investor ever
+ * sees another.
+ */
+
+function ownsOffering(subject: PolicySubject, offering: OfferingLike): boolean {
+  return offering.company_id === subject.companyId
+}
+
+/** The subset of an offering the policy layer needs. Keeps callers cheap. */
+export interface OfferingLike {
+  id: string
+  deal_id: string
+  company_id: string
+  status: OfferingStatus
+}
+
+/** Statuses at which an offering is visible to investors at all. */
+const INVESTOR_VISIBLE_STATUSES: OfferingStatus[] = [
+  'live', 'paused', 'fully_subscribed', 'closed',
+]
+
+/**
+ * An offering is discoverable once it has been published. Before that it
+ * belongs to the sponsor and the reviewers, however complete it looks.
+ */
+export function isOfferingPublished(offering: OfferingLike): boolean {
+  return INVESTOR_VISIBLE_STATUSES.includes(offering.status)
+}
+
+export function canViewOffering(subject: PolicySubject, offering: OfferingLike): boolean {
+  if (subject.isAdmin) return true
+  if (ownsOffering(subject, offering)) return true
+  if (subject.companyType !== 'investor') return false
+  return isOfferingPublished(offering)
+}
+
+/** Only the sponsor that owns the deal, or an administrator, may edit terms. */
+export function canEditOffering(subject: PolicySubject, offering: OfferingLike): boolean {
+  if (subject.memberRole === 'viewer') return false
+  if (subject.isAdmin) return true
+  if (!ownsOffering(subject, offering)) return false
+  // Once an offering is live its terms are frozen; a change writes a version
+  // and goes back through review rather than editing what investors have read.
+  return offering.status === 'draft' || offering.status === 'under_review'
+}
+
+/**
+ * Publication is an administrator's decision, never a sponsor's. The sponsor
+ * submits; a reviewer with the compliance picture publishes.
+ */
+export function canPublishOffering(subject: PolicySubject): boolean {
+  return subject.isAdmin
+}
+
+export function canReviewOffering(subject: PolicySubject): boolean {
+  return subject.isAdmin
+}
+
+/**
+ * Whether an investor may see a document at a given access level.
+ *
+ * Access is a ladder: reaching a rung grants everything below it. The rung an
+ * investor stands on comes from their engagement with this specific offering,
+ * so interest in one offering never opens another's data room.
+ */
+export function canViewOfferingDocument(
+  subject: PolicySubject,
+  offering: OfferingLike,
+  accessLevel: OfferingAccessLevel,
+  stage: InvestmentStage | null,
+): boolean {
+  if (subject.isAdmin) return true
+  if (ownsOffering(subject, offering)) return true
+  if (accessLevel === 'admin_only') return false
+  if (subject.companyType !== 'investor') return false
+  if (!isOfferingPublished(offering)) return false
+
+  const reached = investorAccessLevel(stage)
+  return OFFERING_ACCESS_ORDER.indexOf(accessLevel) <= OFFERING_ACCESS_ORDER.indexOf(reached)
+}
+
+const OFFERING_ACCESS_ORDER: OfferingAccessLevel[] = [
+  'public_teaser', 'verified_investor', 'interested_investor',
+  'committed_investor', 'closing_investor', 'admin_only',
+]
+
+/** The highest access level an investor's engagement has earned. */
+export function investorAccessLevel(stage: InvestmentStage | null): OfferingAccessLevel {
+  switch (stage) {
+    case null:
+    case undefined:
+      return 'public_teaser'
+    case 'withdrawn':
+    case 'declined':
+      return 'public_teaser'
+    case 'interested':
+    case 'eligibility_check':
+      return 'verified_investor'
+    case 'reviewing_documents':
+    case 'application':
+      return 'interested_investor'
+    case 'commitment_pending':
+    case 'commitment_submitted':
+      return 'committed_investor'
+    case 'investment_pending':
+    case 'invested':
+      return 'closing_investor'
+    default:
+      return 'public_teaser'
+  }
+}
+
+/** An investor's own record: theirs and the platform's, nobody else's. */
+export function canViewInvestorRecord(
+  subject: PolicySubject,
+  record: { investor_id: string },
+): boolean {
+  if (subject.isAdmin) return true
+  return subject.investorId !== null && record.investor_id === subject.investorId
+}
+
+/**
+ * A sponsor sees who has engaged with its own offering — that is the point of
+ * raising capital. It does not see anything about that investor's dealings
+ * elsewhere, which is why this takes the offering as well as the record.
+ */
+export function canViewCommitment(
+  subject: PolicySubject,
+  commitment: { investor_id: string; offering_id: string },
+  offering: OfferingLike,
+): boolean {
+  if (subject.isAdmin) return true
+  if (commitment.offering_id !== offering.id) return false
+  if (ownsOffering(subject, offering)) return true
+  return canViewInvestorRecord(subject, commitment)
+}
+
+/** Only the investor who holds a position, and administrators, may see it. */
+export function canViewPosition(
+  subject: PolicySubject,
+  position: { investor_id: string },
+): boolean {
+  return canViewInvestorRecord(subject, position)
+}
+
+/**
+ * A question is visible to its author and the sponsor always; to other
+ * investors only when the author chose to share it and a moderator has not
+ * pulled it.
+ */
+export function canViewQuestion(
+  subject: PolicySubject,
+  question: { investor_id: string; visibility: 'private' | 'shared'; status: string },
+  offering: OfferingLike,
+): boolean {
+  if (subject.isAdmin) return true
+  if (ownsOffering(subject, offering)) return true
+  if (canViewInvestorRecord(subject, question)) return true
+  if (subject.companyType !== 'investor') return false
+  return question.visibility === 'shared' && question.status === 'answered'
+}
+
+/** Sponsors answer questions on their own offering; administrators moderate. */
+export function canAnswerQuestion(subject: PolicySubject, offering: OfferingLike): boolean {
+  if (subject.memberRole === 'viewer') return false
+  return subject.isAdmin || ownsOffering(subject, offering)
+}
+
+/**
+ * Whether an actor may act as an investor at all. A borrower browsing the
+ * marketplace is not an investor, and must not reach an eligibility check.
+ */
+export function isInvestorSubject(subject: PolicySubject): boolean {
+  return subject.companyType === 'investor' && subject.investorId !== null
+}
+
+/** The capital stack belongs to the deal, and follows the deal's own rules. */
+export function canViewCapitalStack(subject: PolicySubject, deal: Deal): boolean {
+  return canViewDeal(subject, deal)
+}
+
+export function canEditCapitalStack(subject: PolicySubject, deal: Deal): boolean {
+  return canEditDeal(subject, deal)
 }

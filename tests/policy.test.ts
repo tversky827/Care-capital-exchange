@@ -15,21 +15,21 @@ const RIVAL_LENDER_ID = 'lender-2'
 
 const borrower: PolicySubject = {
   userId: 'u1', companyId: BORROWER_CO, companyType: 'borrower', memberRole: 'owner',
-  lenderId: null, isAdmin: false,
+  lenderId: null, investorId: null, isAdmin: false,
 }
 const borrowerViewer: PolicySubject = { ...borrower, userId: 'u1v', memberRole: 'viewer' }
 const otherBorrower: PolicySubject = { ...borrower, userId: 'u2', companyId: OTHER_BORROWER_CO }
 const lender: PolicySubject = {
   userId: 'u3', companyId: LENDER_CO, companyType: 'lender', memberRole: 'member',
-  lenderId: LENDER_ID, isAdmin: false,
+  lenderId: LENDER_ID, investorId: null, isAdmin: false,
 }
 const rivalLender: PolicySubject = {
   userId: 'u4', companyId: RIVAL_LENDER_CO, companyType: 'lender', memberRole: 'member',
-  lenderId: RIVAL_LENDER_ID, isAdmin: false,
+  lenderId: RIVAL_LENDER_ID, investorId: null, isAdmin: false,
 }
 const admin: PolicySubject = {
   userId: 'u5', companyId: 'co-admin', companyType: 'admin', memberRole: 'owner',
-  lenderId: null, isAdmin: true,
+  lenderId: null, investorId: null, isAdmin: true,
 }
 
 function makeDeal(overrides: Partial<Deal> = {}): Deal {

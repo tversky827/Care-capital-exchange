@@ -14,8 +14,8 @@ export type ISODate = string
 // Identity
 // ---------------------------------------------------------------------------
 
-export type UserRole = 'borrower' | 'lender' | 'broker' | 'admin'
-export type CompanyType = 'borrower' | 'lender' | 'broker' | 'admin'
+export type UserRole = 'borrower' | 'lender' | 'broker' | 'investor' | 'admin'
+export type CompanyType = 'borrower' | 'lender' | 'broker' | 'investor' | 'admin'
 export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 export interface User {
@@ -999,3 +999,9 @@ export interface AiUsageEvent {
   success: boolean
   created_at: ISODate
 }
+
+// ---------------------------------------------------------------------------
+// Equity marketplace
+// ---------------------------------------------------------------------------
+
+export * from './equity'

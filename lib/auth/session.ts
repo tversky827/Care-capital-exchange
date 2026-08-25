@@ -2,7 +2,7 @@ import 'server-only'
 import { cookies, headers } from 'next/headers'
 import { cache } from 'react'
 import { db } from '@/db'
-import type { Company, CompanyMember, Lender, User } from '@/types'
+import type { Company, CompanyMember, InvestorProfile, Lender, User } from '@/types'
 import { SESSION_TTL_SECONDS, signToken, verifyToken } from './tokens'
 
 export const SESSION_COOKIE = 'ccx_session'
@@ -19,10 +19,13 @@ export interface Actor {
   membership: CompanyMember
   /** Present only when the actor's company is a lender organisation. */
   lender: Lender | null
+  /** Present only when the actor's company is an investing organisation. */
+  investor: InvestorProfile | null
   isAdmin: boolean
   isLender: boolean
   isBorrower: boolean
   isBroker: boolean
+  isInvestor: boolean
   /** Membership roles that may mutate deal data. */
   canWrite: boolean
 }
@@ -75,15 +78,22 @@ export async function resolveActor(userId: string, companyId: string): Promise<A
       ? await store.selectOne('lenders', { where: { company_id: companyId } })
       : null
 
+  const investor =
+    company.type === 'investor'
+      ? await store.selectOne('investor_profiles', { where: { company_id: companyId } })
+      : null
+
   return {
     user,
     company,
     membership,
     lender,
+    investor,
     isAdmin: user.role === 'admin' || company.type === 'admin',
     isLender: company.type === 'lender',
     isBorrower: company.type === 'borrower',
     isBroker: company.type === 'broker',
+    isInvestor: company.type === 'investor',
     canWrite: membership.role !== 'viewer',
   }
 }

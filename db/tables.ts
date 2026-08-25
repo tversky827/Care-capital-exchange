@@ -12,6 +12,14 @@ import type {
   SavedSearch, Sponsor, SponsorExperience, Subscription, TransactionTerms, UnderwritingMetric,
   UnderwritingRisk, UnderwritingRun, User,
 } from '@/types'
+import type {
+  CapitalSource, CapitalStack, ComplianceReview, DisclosureAcknowledgement, DistributionEvent,
+  InvestmentCommitment, InvestmentDistribution, InvestmentInterest, InvestmentPosition,
+  InvestmentScenario, InvestmentTransaction, InvestorAnswer, InvestorMatch, InvestorPreferences,
+  InvestorProfile, InvestorQuestion, InvestorUpdate, InvestorVerification, Offering,
+  OfferingDisclosure, OfferingDocument, OfferingEligibility, OfferingTerms, OfferingVersion,
+  RiskAssessment, SavedInvestment, TaxDocument, WaterfallStructure, WaterfallTier,
+} from '@/types/equity'
 
 export interface Tables {
   users: User
@@ -56,6 +64,37 @@ export interface Tables {
   subscriptions: Subscription
   billing_events: BillingEvent
   ai_usage_events: AiUsageEvent
+
+  // --- equity marketplace ---------------------------------------------------
+  investor_profiles: InvestorProfile
+  investor_preferences: InvestorPreferences
+  investor_verifications: InvestorVerification
+  offerings: Offering
+  offering_terms: OfferingTerms
+  offering_eligibility: OfferingEligibility
+  offering_disclosures: OfferingDisclosure
+  offering_documents: OfferingDocument
+  offering_versions: OfferingVersion
+  disclosure_acknowledgements: DisclosureAcknowledgement
+  investment_interests: InvestmentInterest
+  investment_commitments: InvestmentCommitment
+  investment_transactions: InvestmentTransaction
+  investment_positions: InvestmentPosition
+  distribution_events: DistributionEvent
+  investment_distributions: InvestmentDistribution
+  waterfall_structures: WaterfallStructure
+  waterfall_tiers: WaterfallTier
+  investor_updates: InvestorUpdate
+  tax_documents: TaxDocument
+  investor_questions: InvestorQuestion
+  investor_answers: InvestorAnswer
+  risk_assessments: RiskAssessment
+  investment_scenarios: InvestmentScenario
+  capital_stacks: CapitalStack
+  capital_sources: CapitalSource
+  investor_matches: InvestorMatch
+  saved_investments: SavedInvestment
+  compliance_reviews: ComplianceReview
 }
 
 export type TableName = keyof Tables
@@ -70,7 +109,20 @@ export const TABLE_NAMES: TableName[] = [
   'lender_notes', 'saved_searches', 'matches', 'deal_distributions', 'indications',
   'indication_conditions', 'message_threads', 'messages', 'data_requests', 'notifications',
   'audit_logs', 'jobs', 'subscriptions', 'billing_events', 'ai_usage_events',
+  'investor_profiles', 'investor_preferences', 'investor_verifications', 'offerings',
+  'offering_terms', 'offering_eligibility', 'offering_disclosures', 'offering_documents',
+  'offering_versions', 'disclosure_acknowledgements', 'investment_interests',
+  'investment_commitments', 'investment_transactions', 'investment_positions',
+  'distribution_events', 'investment_distributions', 'waterfall_structures', 'waterfall_tiers',
+  'investor_updates', 'tax_documents', 'investor_questions', 'investor_answers',
+  'risk_assessments', 'investment_scenarios', 'capital_stacks', 'capital_sources',
+  'investor_matches', 'saved_investments', 'compliance_reviews',
 ]
 
 /** Tables that must never be updated or deleted through the ordinary data API. */
-export const APPEND_ONLY_TABLES: TableName[] = ['audit_logs', 'document_access_logs', 'ai_usage_events']
+export const APPEND_ONLY_TABLES: TableName[] = [
+  'audit_logs', 'document_access_logs', 'ai_usage_events',
+  // An acknowledgement is evidence that a person accepted specific words at a
+  // specific time. Editing one would destroy the only thing it is for.
+  'disclosure_acknowledgements', 'offering_versions',
+]

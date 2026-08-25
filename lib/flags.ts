@@ -1,0 +1,91 @@
+/**
+ * Feature flags.
+ *
+ * The equity marketplace touches securities regulation, so the capabilities it
+ * adds are individually switchable rather than shipped as one block. Legal and
+ * compliance decide what is on; engineering decides only that the switch works.
+ *
+ * Every flag is read from the environment at call time — not captured at module
+ * load — so a deployment can change one without a rebuild, and a test can set
+ * one for a single case.
+ *
+ * The defaults are deliberately conservative. Anything that touches an actual
+ * securities transaction, real investor verification or money movement is OFF
+ * unless a deployment turns it on. Browsing, onboarding and the demo workflow
+ * are ON so the product is explorable out of the box.
+ */
+
+export const FLAGS = {
+  /** The equity marketplace as a whole. Off means the product is debt-only. */
+  EQUITY_MARKETPLACE_ENABLED: true,
+  /** Investors may register and complete onboarding. */
+  INVESTOR_ONBOARDING_ENABLED: true,
+  /** Investors may record a non-binding commitment against an offering. */
+  INVESTMENT_COMMITMENTS_ENABLED: true,
+  /**
+   * Commitments may be handed to a transaction provider — a broker-dealer,
+   * funding portal or custodian. Off means the workflow stops at a recorded
+   * commitment and no securities transaction is ever initiated.
+   */
+  INVESTMENT_TRANSACTIONS_ENABLED: false,
+  /** Regulation Crowdfunding offerings may be created. */
+  REG_CF_ENABLED: false,
+  /** Regulation D 506(b) and 506(c) offerings may be created. */
+  REG_D_ENABLED: true,
+  /** Accreditation is checked through a verification provider. */
+  ACCREDITED_INVESTOR_VERIFICATION_ENABLED: true,
+  /** Distribution schedules and statements are visible to investors. */
+  DISTRIBUTIONS_ENABLED: true,
+  /** Tax document tracking is visible to investors. */
+  TAX_DOCUMENTS_ENABLED: true,
+} as const
+
+export type FeatureFlag = keyof typeof FLAGS
+
+/**
+ * Whether a capability is switched on for this deployment.
+ *
+ * An environment variable of the same name overrides the default: "false",
+ * "0" and "off" disable, "true", "1" and "on" enable. Anything else is
+ * ignored rather than guessed at, so a typo cannot silently enable a
+ * securities capability.
+ */
+export function isEnabled(flag: FeatureFlag): boolean {
+  const raw = process.env[flag]
+  if (raw !== undefined) {
+    const value = raw.trim().toLowerCase()
+    if (['false', '0', 'off', 'no'].includes(value)) return false
+    if (['true', '1', 'on', 'yes'].includes(value)) return true
+  }
+  return FLAGS[flag]
+}
+
+/**
+ * Flags a nested capability depends on. A commitment is meaningless without the
+ * marketplace, so asking for the child implies asking for the parent too.
+ */
+const REQUIRES: Partial<Record<FeatureFlag, FeatureFlag[]>> = {
+  INVESTOR_ONBOARDING_ENABLED: ['EQUITY_MARKETPLACE_ENABLED'],
+  INVESTMENT_COMMITMENTS_ENABLED: ['EQUITY_MARKETPLACE_ENABLED'],
+  INVESTMENT_TRANSACTIONS_ENABLED: ['EQUITY_MARKETPLACE_ENABLED', 'INVESTMENT_COMMITMENTS_ENABLED'],
+  REG_CF_ENABLED: ['EQUITY_MARKETPLACE_ENABLED'],
+  REG_D_ENABLED: ['EQUITY_MARKETPLACE_ENABLED'],
+  DISTRIBUTIONS_ENABLED: ['EQUITY_MARKETPLACE_ENABLED'],
+  TAX_DOCUMENTS_ENABLED: ['EQUITY_MARKETPLACE_ENABLED'],
+}
+
+/** Whether a capability and everything it rests on are switched on. */
+export function isAvailable(flag: FeatureFlag): boolean {
+  if (!isEnabled(flag)) return false
+  return (REQUIRES[flag] ?? []).every((required) => isEnabled(required))
+}
+
+/** The whole flag set, for the admin console. */
+export function flagSnapshot(): { flag: FeatureFlag; enabled: boolean; available: boolean; overridden: boolean }[] {
+  return (Object.keys(FLAGS) as FeatureFlag[]).map((flag) => ({
+    flag,
+    enabled: isEnabled(flag),
+    available: isAvailable(flag),
+    overridden: process.env[flag] !== undefined,
+  }))
+}
