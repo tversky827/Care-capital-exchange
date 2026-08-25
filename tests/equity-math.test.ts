@@ -4,6 +4,11 @@ import {
   grown, irr, netSaleProceeds, ownershipShare,
 } from '@/lib/equity/returns'
 import { defaultTiers, runWaterfall, type WaterfallInput } from '@/lib/equity/waterfall'
+import { analyzeStructures, compareStructures } from '@/lib/equity/structures'
+import {
+  closingSoonEmail, commitmentStatusEmail, distributionEmail, newMatchEmail, offeringOpenEmail,
+  quarterlyUpdateEmail, taxDocumentEmail, verificationRequiredEmail,
+} from '@/services/equity/emails'
 
 /**
  * The equity mathematics decides what investors are actually paid, so every
@@ -201,5 +206,114 @@ describe('waterfall', () => {
     const result = runWaterfall(baseInput({ tiers, preferredReturnPct: null, cashAvailable: 250_000 }))
     expect(result.totalToLimitedPartners).toBe(250_000)
     expect(result.undistributed).toBe(0)
+  })
+})
+
+describe('capital structures', () => {
+  const base = {
+    totalCapitalization: 20_000_000,
+    noi: 1_800_000,
+    seniorRatePct: 7.25,
+    amortizationMonths: 300,
+    interestOnlyMonths: 0,
+    sponsorEquity: 1_000_000,
+    preferredRatePct: 10,
+    projection: null,
+  }
+
+  it('sizes each layer against total capitalisation', () => {
+    const options = analyzeStructures(base)
+    expect(options).toHaveLength(4)
+    for (const option of options) {
+      const total = option.layers.reduce((sum, layer) => sum + layer.amount, 0)
+      // The layers must account for the whole capitalisation exactly.
+      expect(total).toBeCloseTo(20_000_000, 2)
+      expect(option.seniorDebt + option.equityRequired).toBeCloseTo(20_000_000, 2)
+    }
+  })
+
+  it('states the coverage failure rather than hiding the option', () => {
+    // A thin NOI cannot cover high leverage; the option is still returned.
+    const options = analyzeStructures({ ...base, noi: 900_000 })
+    const maximum = options.find((o) => o.key === 'maximum')!
+    expect(maximum.dscr).not.toBeNull()
+    expect(maximum.dscr!).toBeLessThan(1.25)
+    expect(maximum.cons.join(' ')).toMatch(/below the 1.25x/)
+    expect(maximum.risks.join(' ')).toMatch(/decline this leverage/)
+  })
+
+  it('prices the preferred slice and warns what it costs the common', () => {
+    const option = analyzeStructures(base).find((o) => o.key === 'preferred_slice')!
+    const preferred = option.layers.find((l) => l.position === 'preferred_equity')!
+    expect(preferred.costPct).toBeCloseTo(0.1, 4)
+    expect(option.cons.join(' ')).toMatch(/paid before common/)
+    expect(option.risks.join(' ')).toMatch(/compounds against the common/)
+  })
+
+  it('never calls an option best', () => {
+    const options = analyzeStructures(base)
+    const text = JSON.stringify(options).toLowerCase()
+    expect(text).not.toMatch(/\bbest\b|\brecommended\b|\bshould choose\b|\boptimal\b/)
+  })
+
+  it('reports a structure with nothing left to raise instead of projecting one', () => {
+    // The sponsor's own cash covers the whole common equity.
+    const options = analyzeStructures({ ...base, sponsorEquity: 20_000_000 })
+    for (const option of options) {
+      expect(option.investorEquity).toBe(0)
+      expect(option.insufficientData).toMatch(/nothing to raise/)
+    }
+  })
+
+  it('returns nothing rather than guessing when capitalisation is unknown', () => {
+    expect(analyzeStructures({ ...base, totalCapitalization: null })).toEqual([])
+    expect(analyzeStructures({ ...base, totalCapitalization: 0 })).toEqual([])
+  })
+
+  it('builds a comparison whose columns line up with the options', () => {
+    const options = analyzeStructures(base)
+    const rows = compareStructures(options)
+    expect(rows.length).toBeGreaterThan(8)
+    for (const row of rows) expect(row.values).toHaveLength(options.length)
+    // The return rows are marked neutral so the table cannot imply more is better.
+    expect(rows.find((r) => r.label === 'Projected investor IRR')?.neutral).toBe(true)
+  })
+})
+
+describe('investor email templates', () => {
+  const context = {
+    investorName: 'Michael Demo',
+    offeringName: 'Lakeview Skilled Nursing Equity',
+    href: 'https://example.test/investments/abc',
+  }
+
+  it('never promises a return or an approval', () => {
+    const messages = [
+      newMatchEmail('a@b.test', { ...context, reasons: ['You look for skilled nursing assets.'] }),
+      offeringOpenEmail('a@b.test', context),
+      closingSoonEmail('a@b.test', { ...context, closesOn: '14 March' }),
+      commitmentStatusEmail('a@b.test', { ...context, status: 'accepted', amount: '$150,000' }),
+      quarterlyUpdateEmail('a@b.test', { ...context, period: 'Q2 2027', highlights: ['Revenue was $3.9M.'] }),
+      distributionEmail('a@b.test', { ...context, amount: '$2,750', period: 'Q2 2027' }),
+      taxDocumentEmail('a@b.test', { ...context, form: 'Schedule K-1', taxYear: 2026 }),
+      verificationRequiredEmail('a@b.test', { investorName: 'Michael Demo', whatIsNeeded: 'Accreditation is outstanding.', href: context.href }),
+    ]
+    for (const message of messages) {
+      expect(message.body).not.toMatch(/guaranteed|risk-free|safe investment|approved investment|expected return/i)
+      // Every message carries the standing disclosure.
+      expect(message.body).toMatch(/not a broker-dealer/)
+      expect(message.subject.length).toBeGreaterThan(5)
+      expect(message.subject.length).toBeLessThan(120)
+    }
+  })
+
+  it('says a match is a match, not a recommendation', () => {
+    const message = newMatchEmail('a@b.test', { ...context, reasons: ['You look for skilled nursing.'] })
+    expect(message.body).toMatch(/not a recommendation to invest/)
+  })
+
+  it('does not describe a commitment as a purchase of securities', () => {
+    const message = commitmentStatusEmail('a@b.test', { ...context, status: 'accepted', amount: '$150,000' })
+    expect(message.body).toMatch(/not itself a purchase of securities/)
   })
 })

@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/primitives'
 import { CapitalStackChart } from '@/components/equity/capital-stack-chart'
 import { InvestorActions } from './actions-panel'
-import { analyzeOffering } from '@/services/equity/analysis'
+import { AskPanel } from './ask-panel'
+import { analyzeOffering, INVESTOR_SUGGESTED_QUESTIONS } from '@/services/equity/analysis'
 import { activeStack } from '@/services/equity/capital-stack'
 import { dataRoomFor, lockedCounts } from '@/services/equity/data-room'
 import { evaluateEligibility } from '@/services/equity/commitments'
@@ -368,6 +369,8 @@ export default async function OfferingPage({
             isInvestor={Boolean(actor.investor)}
             status={offering.status}
           />
+
+          <AskPanel offeringId={offeringId} suggestions={INVESTOR_SUGGESTED_QUESTIONS} />
 
           {analysis ? (
             <Card>

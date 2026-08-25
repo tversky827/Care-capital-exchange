@@ -11,6 +11,7 @@ import { acceptCommitment } from '@/services/equity/commitments'
 import { createStack, suggestStack } from '@/services/equity/capital-stack'
 import { answerQuestion } from '@/services/equity/portfolio'
 import { recomputeMatches } from '@/services/equity/matching'
+import { draftUpdate, publishUpdate } from '@/services/equity/updates'
 import type { ActionState } from '@/app/(app)/deals/actions'
 import type { OfferingType } from '@/types/equity'
 
@@ -181,4 +182,44 @@ export async function recomputeMatchesAction(_prev: ActionState, formData: FormD
 export async function qualityCheckAction(offeringId: string) {
   await requireActor()
   return checkOfferingQuality(offeringId)
+}
+
+export async function draftUpdateAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const offeringId = String(formData.get('offeringId') ?? '')
+  const dealId = String(formData.get('dealId') ?? '')
+  const periodLabel = String(formData.get('periodLabel') ?? '').trim()
+  if (!periodLabel) return { error: 'Name the period this update covers.' }
+  try {
+    const actor = await requireActor()
+    await draftUpdate(actor, offeringId, {
+      periodLabel,
+      notes: String(formData.get('notes') ?? '') || null,
+      metrics: {
+        revenue: numberOrNull(formData.get('revenue')),
+        ebitda: numberOrNull(formData.get('ebitda')),
+        occupancy_pct: numberOrNull(formData.get('occupancy')),
+        agency_labor_pct: numberOrNull(formData.get('agencyLabor')),
+        debt_balance: numberOrNull(formData.get('debtBalance')),
+        capex: numberOrNull(formData.get('capex')),
+        distribution_per_100k: numberOrNull(formData.get('distribution')),
+      },
+    })
+    revalidatePath(`/deals/${dealId}/equity`)
+    return { success: 'Update drafted. Review it before publishing to investors.' }
+  } catch (error) {
+    return failure(error)
+  }
+}
+
+export async function publishUpdateAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const updateId = String(formData.get('updateId') ?? '')
+  const dealId = String(formData.get('dealId') ?? '')
+  try {
+    const actor = await requireActor()
+    await publishUpdate(actor, updateId)
+    revalidatePath(`/deals/${dealId}/equity`)
+    return { success: 'Published to the investors in this offering.' }
+  } catch (error) {
+    return failure(error)
+  }
 }

@@ -200,3 +200,130 @@ function leverageOf(loanAmount: number | null, totalCost: number | null): number
   if (loanAmount === null || totalCost === null || totalCost <= 0) return null
   return loanAmount / totalCost
 }
+
+// ---------------------------------------------------------------------------
+// Search, saved investments, comparison
+// ---------------------------------------------------------------------------
+
+export interface OfferingSearch {
+  assetTypes?: string[]
+  states?: string[]
+  capitalPositions?: string[]
+  maxMinimum?: number | null
+  minTargetRaise?: number | null
+  maxTargetRaise?: number | null
+  maxHoldMonths?: number | null
+  minTargetReturnPct?: number | null
+  status?: 'live' | 'all'
+  sponsor?: string | null
+  query?: string | null
+}
+
+export interface SearchRow {
+  offering: import('@/types/equity').Offering
+  terms: import('@/types/equity').OfferingTerms | null
+  deal: import('@/types').Deal
+  facility: import('@/types').Facility | null
+  match: InvestorMatch | null
+  saved: boolean
+}
+
+/**
+ * Filters the published marketplace.
+ *
+ * Filtering happens in the query layer rather than the browser so a listing
+ * never carries offerings the viewer then has to be prevented from seeing.
+ * Unpublished offerings are excluded before any filter is applied.
+ */
+export async function searchOfferings(
+  investorId: string | null,
+  search: OfferingSearch = {},
+): Promise<SearchRow[]> {
+  const store = await db()
+  const all = await store.select('offerings', { orderBy: { field: 'published_at', dir: 'desc' } })
+  const visible = all.filter((offering) => {
+    if (search.status === 'all') {
+      return ['live', 'paused', 'fully_subscribed', 'closed'].includes(offering.status)
+    }
+    return offering.status === 'live'
+  })
+
+  const [matches, saved] = investorId
+    ? await Promise.all([
+      store.select('investor_matches', { where: { investor_id: investorId } }),
+      store.select('saved_investments', { where: { investor_id: investorId } }),
+    ])
+    : [[], []]
+
+  const rows: SearchRow[] = []
+  for (const offering of visible) {
+    const [terms, deal] = await Promise.all([
+      store.selectOne('offering_terms', { where: { offering_id: offering.id } }),
+      store.findById('deals', offering.deal_id),
+    ])
+    if (!deal) continue
+    const facility = await store.selectOne('facilities', { where: { deal_id: deal.id } })
+
+    if (search.assetTypes?.length && !search.assetTypes.includes(deal.asset_type)) continue
+    if (search.states?.length && (!facility?.state || !search.states.includes(facility.state))) continue
+    if (search.capitalPositions?.length
+      && (!terms || !search.capitalPositions.includes(terms.capital_position))) continue
+    if (search.maxMinimum != null
+      && offering.minimum_investment !== null
+      && offering.minimum_investment > search.maxMinimum) continue
+    if (search.minTargetRaise != null
+      && (offering.target_raise ?? 0) < search.minTargetRaise) continue
+    if (search.maxTargetRaise != null
+      && (offering.target_raise ?? Number.POSITIVE_INFINITY) > search.maxTargetRaise) continue
+    if (search.maxHoldMonths != null
+      && (terms?.target_hold_months ?? 0) > search.maxHoldMonths) continue
+    if (search.minTargetReturnPct != null
+      && (terms?.target_irr_pct ?? 0) < search.minTargetReturnPct) continue
+    if (search.query) {
+      const haystack = `${offering.name} ${offering.summary ?? ''} ${facility?.state ?? ''}`.toLowerCase()
+      if (!haystack.includes(search.query.toLowerCase())) continue
+    }
+
+    rows.push({
+      offering,
+      terms,
+      deal,
+      facility,
+      match: matches.find((m) => m.offering_id === offering.id) ?? null,
+      saved: saved.some((s) => s.offering_id === offering.id),
+    })
+  }
+  return rows
+}
+
+/** Adds or removes an offering from the investor's watchlist. */
+export async function toggleSaved(
+  actor: Actor,
+  offeringId: string,
+): Promise<{ saved: boolean }> {
+  const { requireOwnProfile } = await import('./investors')
+  const profile = await requireOwnProfile(actor)
+  const store = await db()
+  const existing = await store.selectOne('saved_investments', {
+    where: { investor_id: profile.id, offering_id: offeringId },
+  })
+  if (existing) {
+    await store.remove('saved_investments', existing.id)
+    return { saved: false }
+  }
+  await store.insert('saved_investments', {
+    investor_id: profile.id,
+    offering_id: offeringId,
+    notify_on_change: true,
+    notes: null,
+  } as Omit<import('@/types/equity').SavedInvestment, 'id' | 'created_at'>)
+  return { saved: true }
+}
+
+export async function savedOfferings(investorId: string): Promise<SearchRow[]> {
+  const store = await db()
+  const saved = await store.select('saved_investments', { where: { investor_id: investorId } })
+  const ids = new Set(saved.map((s) => s.offering_id))
+  const rows = await searchOfferings(investorId, { status: 'all' })
+  return rows.filter((row) => ids.has(row.offering.id))
+}

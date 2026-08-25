@@ -11,6 +11,8 @@ import { capitalRequirement } from '@/services/equity/capital-stack'
 import { matchCountsForOffering } from '@/services/equity/matching'
 import { questionsFor } from '@/services/equity/portfolio'
 import { OfferingControls, QuestionReply } from './controls'
+import { UpdatesPanel } from './updates'
+import { updatesForOffering } from '@/services/equity/updates'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,12 +59,13 @@ export default async function EquityPage({
   }
 
   const rows = await Promise.all(offerings.map(async (offering) => {
-    const [terms, counts, commitments, interests, questions] = await Promise.all([
+    const [terms, counts, commitments, interests, questions, updates] = await Promise.all([
       store.selectOne('offering_terms', { where: { offering_id: offering.id } }),
       matchCountsForOffering(offering.id),
       store.select('investment_commitments', { where: { offering_id: offering.id } }),
       store.select('investment_interests', { where: { offering_id: offering.id } }),
       questionsFor(actor, offering.id),
+      updatesForOffering(actor, offering.id),
     ])
 
     const investors = await Promise.all(commitments.map(async (commitment) => ({
@@ -70,12 +73,12 @@ export default async function EquityPage({
       profile: await store.findById('investor_profiles', commitment.investor_id),
     })))
 
-    return { offering, terms, counts, commitments, interests, questions, investors }
+    return { offering, terms, counts, commitments, interests, questions, investors, updates }
   }))
 
   return (
     <div className="space-y-5">
-      {rows.map(({ offering, terms, counts, commitments, interests, questions, investors }) => {
+      {rows.map(({ offering, terms, counts, commitments, interests, questions, investors, updates }) => {
         const progress = offering.target_raise && offering.target_raise > 0
           ? offering.committed_amount / offering.target_raise
           : null
@@ -193,6 +196,13 @@ export default async function EquityPage({
                 </CardBody>
               </Section>
             ) : null}
+
+            <UpdatesPanel
+              offeringId={offering.id}
+              dealId={dealId}
+              updates={updates}
+              investorCount={accepted.length}
+            />
 
             {questions.length > 0 ? (
               <Section title="Investor questions">

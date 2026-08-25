@@ -301,3 +301,65 @@ export async function projectInvestment(
 function scale(value: number | null, share: number): number | null {
   return value === null ? null : Math.round(value * share * 100) / 100
 }
+
+// ---------------------------------------------------------------------------
+// Ask the offering
+// ---------------------------------------------------------------------------
+
+/** Questions an investor is most often served by asking first. */
+export const INVESTOR_SUGGESTED_QUESTIONS = [
+  'What are the biggest risks in this investment?',
+  'How much debt is on the property, and on what terms?',
+  'What happens to distributions if occupancy falls to 80%?',
+  'How is the projected return calculated?',
+  'What assumptions drive the exit valuation?',
+  'What percentage of revenue comes from Medicaid?',
+  'How experienced is the sponsor?',
+  'Show me every assumption behind the projections.',
+] as const
+
+/**
+ * Answers an investor's question about an offering.
+ *
+ * Reuses the deal intelligence the debt side already has, with the offering's
+ * own terms, projections and risk assessment added to the context — so a
+ * question about the exit assumption or the preferred return can be answered
+ * from the record rather than deflected.
+ *
+ * The answer is only ever assembled from supplied context. A question the
+ * record cannot answer comes back saying so, which is the whole point: an
+ * investor who is told "the record does not say" has learned something true.
+ */
+export async function askOffering(
+  offeringId: string,
+  question: string,
+): Promise<import('@/lib/ai/schemas').DealChatAnswer & { offeringContext: boolean }> {
+  const store = await db()
+  const offering = await store.findById('offerings', offeringId)
+  if (!offering) throw new Error('Offering not found.')
+
+  const assembled = await analysisInput(offeringId)
+  const { askDeal } = await import('@/services/chat')
+
+  // The deal-level answer carries the citations, which is what makes it
+  // trustworthy; the offering context is appended to the question so the model
+  // and the local analyst both see the terms an investor is actually asking about.
+  const framing = assembled
+    ? [
+      `Offering: ${offering.name}, ${offering.offering_type}.`,
+      offering.target_raise ? `Raising ${offering.target_raise}.` : null,
+      assembled.terms?.target_hold_months ? `Target hold ${assembled.terms.target_hold_months / 12} years.` : null,
+      assembled.terms?.preferred_return_pct ? `Preferred return ${assembled.terms.preferred_return_pct * 100}%.` : null,
+      assembled.projection.insufficientData === null && assembled.projection.irrPct !== null
+        ? `Projected internal rate of return ${assembled.projection.irrPct}% and equity multiple ${assembled.projection.equityMultiple}, from the sponsor's stated assumptions: ${assembled.projection.assumptionsUsed.map((a) => `${a.label} ${a.value}`).join('; ')}.`
+        : 'Returns cannot be projected because the sponsor has not stated the required assumptions.',
+      assembled.risk.categories.map((c) => `${c.category} risk ${c.band}: ${c.rationale}`).join(' '),
+    ].filter(Boolean).join(' ')
+    : ''
+
+  const answer = await askDeal(
+    offering.deal_id,
+    framing ? `${question}\n\nOffering context: ${framing}` : question,
+  )
+  return { ...answer, offeringContext: Boolean(framing) }
+}

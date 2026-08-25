@@ -7,6 +7,7 @@ import { round } from '@/lib/finance/calculations'
 import { recordAudit } from '../audit'
 import { matchCountsForOffering } from './matching'
 import type { Actor } from '@/lib/auth/session'
+import { analyzeStructures, compareStructures, type ComparisonRow, type StructureOption } from '@/lib/equity/structures'
 import type { CapitalPosition, CapitalSource, CapitalStack } from '@/types/equity'
 
 /**
@@ -20,6 +21,58 @@ import type { CapitalPosition, CapitalSource, CapitalStack } from '@/types/equit
  * cost, the indications lenders have actually made, the commitments investors
  * have actually made. Nothing is estimated on the sponsor's behalf.
  */
+
+/**
+ * What the capital stack actually sits against, and on what basis.
+ *
+ * An acquisition capitalises at what it costs to buy: price plus closing
+ * costs, capital expenditure and working capital. A refinance or
+ * recapitalisation has no purchase price — the stack sits against what the
+ * asset is worth, so the appraisal is the basis. Using the acquisition figure
+ * for a refinance produces a capitalisation smaller than the loan against it,
+ * which is not a small error: every ratio computed from it is then nonsense.
+ *
+ * Returns null rather than guessing when neither basis is available. A capital
+ * structure priced off an invented capitalisation is worse than none.
+ */
+export interface Capitalization {
+  amount: number | null
+  basis: 'acquisition_cost' | 'appraised_value' | 'unavailable'
+  explanation: string
+}
+
+export function capitalizationOf(snapshot: NonNullable<Awaited<ReturnType<typeof buildSnapshot>>>): Capitalization {
+  const terms = snapshot.terms
+  const loanAmount = snapshot.summary.loanAmount
+  const extras = (terms?.estimated_closing_costs ?? 0)
+    + (terms?.capex_requirement ?? 0)
+    + (terms?.working_capital_requirement ?? 0)
+
+  if (terms?.purchase_price) {
+    return {
+      amount: snapshot.summary.totalCost,
+      basis: 'acquisition_cost',
+      explanation: 'Purchase price plus closing costs, capital expenditure and working capital.',
+    }
+  }
+
+  if (terms?.appraised_value) {
+    return {
+      amount: round(terms.appraised_value + extras, 2),
+      basis: 'appraised_value',
+      explanation: 'The appraised value of the asset, plus transaction costs. This deal has no purchase price, so value is the basis rather than cost.',
+    }
+  }
+
+  // A loan with nothing to measure it against cannot produce a capital stack.
+  return {
+    amount: null,
+    basis: 'unavailable',
+    explanation: loanAmount
+      ? 'This deal has neither a purchase price nor an appraised value, so there is nothing to size a capital structure against.'
+      : 'This deal has not been underwritten far enough to establish a capitalisation.',
+  }
+}
 
 export interface CapitalRequirement {
   /** What the transaction costs in total, including fees and reserves. */
@@ -55,9 +108,14 @@ export async function capitalRequirement(dealId: string): Promise<CapitalRequire
     }
   }
 
-  const totalCost = snapshot.summary.totalCost
+  const capitalization = capitalizationOf(snapshot)
+  const totalCost = capitalization.amount
   const debtRequired = snapshot.summary.loanAmount
-  const equityRequired = snapshot.summary.equityRequirement
+  // Equity is what the capitalisation does not raise as debt. For a refinance
+  // this is the owner's existing equity in the asset rather than new money.
+  const equityRequired = totalCost !== null && debtRequired !== null
+    ? round(Math.max(0, totalCost - debtRequired), 2)
+    : snapshot.summary.equityRequirement
 
   // The best live indication is what the debt is actually worth today.
   const indications = await store.select('indications', { where: { deal_id: dealId } })
@@ -311,4 +369,91 @@ export async function capitalMarketsView(actor: Actor, dealId: string): Promise<
       committed: requirement.equityCommitted ?? 0,
     },
   }
+}
+
+/**
+ * The structures this deal's own figures will support, priced and compared.
+ *
+ * Reads the deal's underwriting and the best rate a lender has actually
+ * indicated, so the options reflect what is on the table rather than what
+ * would be nice. Returns an empty list when the deal has not been underwritten
+ * far enough to price anything.
+ */
+export async function structureOptions(
+  actor: Actor,
+  dealId: string,
+): Promise<{ options: StructureOption[]; comparison: ComparisonRow[]; ratePctUsed: number | null; rateSource: string }> {
+  const store = await db()
+  const deal = await store.findById('deals', dealId)
+  if (!deal) throw new Error('Deal not found.')
+  authorize(canViewCapitalStack(subjectOf(actor), deal), 'This deal is not available to you.')
+
+  const snapshot = await buildSnapshot(dealId)
+  if (!snapshot) return { options: [], comparison: [], ratePctUsed: null, rateSource: 'none' }
+
+  // A rate a lender has actually offered is better evidence than the rate the
+  // borrower asked for. "Lowest" rather than "best": which rate is best depends
+  // on its other terms, and this only compares the number.
+  const indications = await store.select('indications', { where: { deal_id: dealId } })
+  const live = indications.filter((i) => i.status !== 'withdrawn' && i.status !== 'expired')
+  const bestRate = live.length > 0
+    ? Math.min(...live.map((i) => i.all_in_rate_pct))
+    : null
+  const ratePctUsed = bestRate ?? snapshot.assumedTerms.ratePct
+  const rateSource = bestRate !== null
+    ? 'the lowest rate a lender has indicated'
+    : snapshot.assumedTerms.assumed
+      ? 'a platform assumption, since no rate has been requested or indicated'
+      : 'the rate requested on this deal'
+
+  const offerings = await store.select('offerings', { where: { deal_id: dealId } })
+  const preferredOffering = offerings.find((o) => o.status !== 'cancelled')
+  const preferredTerms = preferredOffering
+    ? await store.selectOne('offering_terms', { where: { offering_id: preferredOffering.id } })
+    : null
+
+  const capitalization = capitalizationOf(snapshot)
+  // A capitalisation smaller than the debt against it means the basis is wrong,
+  // and every ratio derived from it would be meaningless.
+  if (capitalization.amount === null
+    || (snapshot.summary.loanAmount !== null && capitalization.amount < snapshot.summary.loanAmount)) {
+    return { options: [], comparison: [], ratePctUsed: null, rateSource: capitalization.explanation }
+  }
+
+  const assumptions = preferredTerms?.assumptions ?? null
+  const options = analyzeStructures({
+    totalCapitalization: capitalization.amount,
+    noi: snapshot.summary.noi,
+    seniorRatePct: ratePctUsed,
+    amortizationMonths: snapshot.assumedTerms.amortizationMonths,
+    interestOnlyMonths: snapshot.terms?.requested_io_months ?? 0,
+    // Whatever the borrower has said they are contributing, less what the
+    // marketplace has already committed on their behalf.
+    sponsorEquity: snapshot.sponsor?.liquidity !== undefined && snapshot.sponsor?.liquidity !== null
+      ? Math.min(snapshot.sponsor.liquidity, snapshot.summary.equityRequirement ?? 0) * 0.25
+      : null,
+    preferredRatePct: preferredTerms?.preferred_return_pct !== null && preferredTerms?.preferred_return_pct !== undefined
+      ? preferredTerms.preferred_return_pct * 100
+      : 10,
+    projection: assumptions
+      ? {
+        revenue: snapshot.latest?.items.revenue ?? null,
+        ebitda: snapshot.latest?.items.ebitda ?? null,
+        noi: snapshot.summary.noi,
+        ratePct: ratePctUsed,
+        amortizationMonths: snapshot.assumedTerms.amortizationMonths,
+        interestOnlyMonths: snapshot.terms?.requested_io_months ?? 0,
+        purchasePrice: snapshot.terms?.purchase_price ?? null,
+        holdYears: assumptions.hold_years,
+        revenueGrowthPct: assumptions.revenue_growth_pct,
+        expenseGrowthPct: assumptions.expense_growth_pct,
+        exitCapRatePct: assumptions.exit_cap_rate_pct,
+        exitMultipleOfEbitda: assumptions.exit_multiple_of_ebitda,
+        sellingCostsPct: assumptions.selling_costs_pct,
+        preferredReturnPct: preferredTerms?.preferred_return_pct ?? null,
+      }
+      : null,
+  })
+
+  return { options, comparison: compareStructures(options), ratePctUsed, rateSource }
 }

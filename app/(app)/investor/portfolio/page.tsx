@@ -6,7 +6,9 @@ import {
   Card, CardBody, CardHeader, CardTitle, EmptyState, PageHeader, Stat, Table, Td, Th, Tr,
 } from '@/components/ui/primitives'
 import { portfolioFor } from '@/services/equity/portfolio'
+import { updatesForInvestor } from '@/services/equity/updates'
 import { assetNoun } from '@/lib/deal/display'
+import { BarChart, DonutChart } from '@/components/charts'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +23,10 @@ export default async function PortfolioPage() {
   const actor = await requireActor()
   if (!actor.investor) redirect('/investor/onboarding')
 
-  const portfolio = await portfolioFor(actor)
+  const [portfolio, updates] = await Promise.all([
+    portfolioFor(actor),
+    updatesForInvestor(actor.investor.id),
+  ])
 
   return (
     <div className="space-y-5">
@@ -88,6 +93,67 @@ export default async function PortfolioPage() {
           <Allocation title="By state" rows={portfolio.byState} total={portfolio.capitalInvested} />
           <Allocation title="By sponsor" rows={portfolio.bySponsor} total={portfolio.capitalInvested} />
         </div>
+      ) : null}
+
+      {portfolio.positions.length > 0 ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle>Invested against distributions received</CardTitle></CardHeader>
+            <CardBody>
+              <BarChart
+                series={portfolio.positions.map((row) => ({
+                  label: row.offering.name.split(' ').slice(0, 2).join(' '),
+                  value: row.position.invested_amount,
+                }))}
+                format={(value) => formatCurrency(value, { compact: true })}
+              />
+              <p className="mt-3 text-[11px] leading-relaxed text-ink-muted">
+                Capital contributed per investment. Both figures on this page are actual amounts,
+                not estimates.
+              </p>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Estimated value against cost</CardTitle></CardHeader>
+            <CardBody>
+              <DonutChart
+                segments={[
+                  { label: 'Capital invested', value: portfolio.capitalInvested },
+                  { label: 'Distributions received', value: portfolio.distributionsReceived },
+                ]}
+                centerLabel="Estimated value"
+                centerValue={formatCurrency(portfolio.estimatedValue, { compact: true })}
+              />
+              <p className="mt-3 text-[11px] leading-relaxed text-ink-muted">
+                The centre figure is the sponsor&rsquo;s current estimate of what these positions
+                are worth. It is an opinion, not a valuation, and it is not independently verified.
+                The segments are amounts that actually moved.
+              </p>
+            </CardBody>
+          </Card>
+        </div>
+      ) : null}
+
+      {updates.length > 0 ? (
+        <Card>
+          <CardHeader><CardTitle>Sponsor updates</CardTitle></CardHeader>
+          <CardBody className="space-y-3">
+            {updates.slice(0, 6).map((update) => (
+              <div key={update.id} className="border-b border-line pb-3 last:border-b-0 last:pb-0">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h4 className="text-[13px] font-semibold text-ink">{update.title}</h4>
+                  <span className="shrink-0 text-[11px] text-ink-muted">
+                    {update.published_at ? formatDate(update.published_at) : ''}
+                  </span>
+                </div>
+                <pre className="mt-1.5 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-ink-secondary">
+                  {update.body}
+                </pre>
+              </div>
+            ))}
+          </CardBody>
+        </Card>
       ) : null}
 
       {portfolio.positions.some((p) => p.distributions.length > 0) ? (

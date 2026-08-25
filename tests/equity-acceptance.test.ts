@@ -366,3 +366,97 @@ describe('the investor reviews and commits', () => {
     }
   })
 })
+
+describe('capitalisation basis', () => {
+  it('capitalises an acquisition at what it costs to buy', async () => {
+    const { buildSnapshot } = await import('@/lib/deal/snapshot')
+    const { capitalizationOf } = await import('@/services/equity/capital-stack')
+    const snapshot = await buildSnapshot(deal.id)
+    const capitalization = capitalizationOf(snapshot!)
+    expect(capitalization.basis).toBe('acquisition_cost')
+    // Price plus costs, and never less than the debt against it.
+    expect(capitalization.amount!).toBeGreaterThanOrEqual(25_000_000)
+    expect(capitalization.amount!).toBeGreaterThan(17_500_000)
+  })
+
+  it('capitalises a refinance at what the asset is worth', async () => {
+    // A refinance has no purchase price. Using acquisition cost would produce a
+    // capitalisation smaller than the loan, and every ratio from it would be wrong.
+    const refinance = await createDeal({
+      actor: borrower,
+      name: 'Refinance Basis Test',
+      assetType: 'snf',
+      transactionType: 'refinance',
+      borrowerPriority: 'lowest_rate',
+      narrative: 'A refinance used to check the capitalisation basis.',
+      facility: {
+        name: 'Refinance Basis Test', city: 'Peoria', state: 'IL',
+        licensed_beds: 100, operating_beds: 100, current_census: 89, occupancy_pct: 89,
+        year_built: 1998, real_estate_included: true,
+      },
+      terms: {
+        requested_financing: 13_900_000,
+        appraised_value: 21_400_000,
+        estimated_closing_costs: 348_000,
+        requested_rate_pct: 6.8,
+        requested_term_months: 60,
+        requested_amortization_months: 300,
+      },
+      sponsor: {
+        legal_entity: 'Chicago Senior Care Partners LLC', years_in_healthcare: 19,
+        years_operating_asset_type: 15, facilities_operated: 11, beds_operated: 1_400,
+        states_operated: ['IL'], historical_acquisitions: 8, previous_exits: 2,
+        prior_defaults: false, net_worth: 34_000_000, liquidity: 9_000_000,
+      },
+    })
+
+    const { buildSnapshot } = await import('@/lib/deal/snapshot')
+    const { capitalizationOf, structureOptions } = await import('@/services/equity/capital-stack')
+    const snapshot = await buildSnapshot(refinance.id)
+    const capitalization = capitalizationOf(snapshot!)
+
+    expect(capitalization.basis).toBe('appraised_value')
+    expect(capitalization.amount).toBe(21_748_000)
+    // The capitalisation must exceed the debt it carries.
+    expect(capitalization.amount!).toBeGreaterThan(13_900_000)
+
+    // And the structures priced off it must be sane rather than absurd.
+    const { options } = await structureOptions(borrower, refinance.id)
+    expect(options.length).toBeGreaterThan(0)
+    for (const option of options) {
+      expect(option.seniorDebt).toBeGreaterThan(10_000_000)
+      // Coverage is null on a deal with no financials, which is correct. When
+      // it is computable, a ratio in the hundreds is the signature of a broken
+      // basis and must not appear.
+      if (option.dscr !== null) expect(option.dscr).toBeLessThan(10)
+    }
+  })
+
+  it('refuses to price a structure it cannot establish a basis for', async () => {
+    const bare = await createDeal({
+      actor: borrower,
+      name: 'No Basis Test',
+      assetType: 'snf',
+      transactionType: 'refinance',
+      borrowerPriority: 'lowest_rate',
+      narrative: 'Neither a purchase price nor an appraisal.',
+      facility: {
+        name: 'No Basis Test', city: 'Peoria', state: 'IL',
+        licensed_beds: 80, operating_beds: 80, current_census: 70, occupancy_pct: 88,
+        year_built: 1990, real_estate_included: true,
+      },
+      terms: { requested_financing: 9_000_000, requested_rate_pct: 7 },
+      sponsor: {
+        legal_entity: 'Chicago Senior Care Partners LLC', years_in_healthcare: 19,
+        years_operating_asset_type: 15, facilities_operated: 11, beds_operated: 1_400,
+        states_operated: ['IL'], historical_acquisitions: 8, previous_exits: 2,
+        prior_defaults: false, net_worth: 34_000_000, liquidity: 9_000_000,
+      },
+    })
+
+    const { structureOptions } = await import('@/services/equity/capital-stack')
+    const result = await structureOptions(borrower, bare.id)
+    expect(result.options).toEqual([])
+    expect(result.rateSource).toMatch(/nothing to size a capital structure against/)
+  })
+})

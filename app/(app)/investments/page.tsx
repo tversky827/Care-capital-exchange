@@ -1,22 +1,33 @@
-import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
 import { isAvailable } from '@/lib/flags'
 import { OfferingCard } from '@/components/equity/offering-card'
 import { Alert, EmptyState, PageHeader } from '@/components/ui/primitives'
-import { matchesForInvestor } from '@/services/equity/matching'
-import type { Deal, Facility } from '@/types'
-import type { InvestorMatch, Offering, OfferingTerms } from '@/types/equity'
+import { searchOfferings, type OfferingSearch } from '@/services/equity/matching'
+import { CompareBar, MarketplaceFilters, SaveButton } from './filters'
 
 export const dynamic = 'force-dynamic'
+
+function numberOrNull(value: string | undefined): number | null {
+  if (!value) return null
+  const parsed = Number(value.replace(/[^0-9.]/g, ''))
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 /**
  * The investment marketplace.
  *
- * Institutional in tone by intent: dense figures, no urgency devices, no
- * countdowns, no social proof. An investor deciding where to put six figures
- * is served by information, not persuasion.
+ * Institutional by intent: dense figures, no urgency devices, no countdowns,
+ * no social proof. Someone deciding where to put six figures is served by
+ * information, not persuasion.
+ *
+ * Filtering happens on the server from the URL, so a filtered view is
+ * shareable and a listing never carries an offering the viewer should not see.
  */
-export default async function InvestmentsPage() {
+export default async function InvestmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const actor = await requireActor()
   if (!isAvailable('EQUITY_MARKETPLACE_ENABLED')) {
     return (
@@ -26,36 +37,32 @@ export default async function InvestmentsPage() {
     )
   }
 
-  const store = await db()
-  const live = await store.select('offerings', { orderBy: { field: 'published_at', dir: 'desc' } })
-  const published = live.filter((o) => ['live', 'fully_subscribed'].includes(o.status))
-
-  const matchByOffering = new Map<string, InvestorMatch>()
-  if (actor.investor) {
-    const matches = await matchesForInvestor(actor.investor.id, { includeIneligible: true })
-    for (const row of matches) matchByOffering.set(row.offering.id, row.match)
+  const params = await searchParams
+  const one = (key: string) => {
+    const value = params[key]
+    return Array.isArray(value) ? value[0] : value
   }
 
-  const rows: {
-    offering: Offering; terms: OfferingTerms | null; deal: Deal; facility: Facility | null
-  }[] = []
-  for (const offering of published) {
-    const [terms, deal] = await Promise.all([
-      store.selectOne('offering_terms', { where: { offering_id: offering.id } }),
-      store.findById('deals', offering.deal_id),
-    ])
-    if (!deal) continue
-    const facility = await store.selectOne('facilities', { where: { deal_id: deal.id } })
-    rows.push({ offering, terms, deal, facility })
+  const search: OfferingSearch = {
+    assetTypes: one('asset') ? [one('asset')!] : undefined,
+    states: one('state') ? [one('state')!.toUpperCase()] : undefined,
+    capitalPositions: one('position') ? [one('position')!] : undefined,
+    maxMinimum: numberOrNull(one('maxMin')),
+    maxHoldMonths: numberOrNull(one('maxHold')) === null ? null : numberOrNull(one('maxHold'))! * 12,
+    minTargetReturnPct: numberOrNull(one('minReturn')),
+    status: one('status') === 'all' ? 'all' : 'live',
+    query: one('q') ?? null,
   }
 
-  // Ordered by fit where the viewer is an investor with preferences set, and
-  // by recency otherwise. Never by size of raise, and never by who is paying.
-  rows.sort((a, b) => {
-    const scoreA = matchByOffering.get(a.offering.id)?.score ?? -1
-    const scoreB = matchByOffering.get(b.offering.id)?.score ?? -1
-    return scoreB - scoreA
-  })
+  const investorId = actor.investor?.id ?? null
+  const [rows, unfiltered] = await Promise.all([
+    searchOfferings(investorId, search),
+    searchOfferings(investorId, { status: search.status }),
+  ])
+
+  // Ordered by fit where the viewer is an investor with preferences set, and by
+  // recency otherwise. Never by size of raise, and never by who is paying.
+  const sorted = [...rows].sort((a, b) => (b.match?.score ?? -1) - (a.match?.score ?? -1))
 
   return (
     <div className="space-y-5">
@@ -71,29 +78,40 @@ export default async function InvestmentsPage() {
         their entire value.
       </Alert>
 
-      {rows.length === 0 ? (
+      <MarketplaceFilters total={unfiltered.length} showing={sorted.length} />
+
+      {sorted.length === 0 ? (
         <EmptyState
-          title="No offerings are open"
-          description="There are no published investment opportunities at the moment. You will be notified when one matching your preferences opens."
+          title="No offerings match"
+          description="No published offering matches these filters. Clearing them shows everything currently open."
         />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map(({ offering, terms, deal, facility }) => (
-            <OfferingCard
-              key={offering.id}
-              offering={offering}
-              terms={terms}
-              deal={deal}
-              facility={facility}
-              match={matchByOffering.get(offering.id) ?? null}
-              committedPct={
-                offering.target_raise && offering.target_raise > 0
-                  ? offering.committed_amount / offering.target_raise
-                  : null
-              }
-            />
-          ))}
-        </div>
+        <>
+          {sorted.length > 1 ? <CompareBar ids={sorted.map((row) => row.offering.id)} /> : null}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {sorted.map((row) => (
+              <div key={row.offering.id} className="space-y-1.5">
+                <OfferingCard
+                  offering={row.offering}
+                  terms={row.terms}
+                  deal={row.deal}
+                  facility={row.facility}
+                  match={row.match}
+                  committedPct={
+                    row.offering.target_raise && row.offering.target_raise > 0
+                      ? row.offering.committed_amount / row.offering.target_raise
+                      : null
+                  }
+                />
+                {actor.investor ? (
+                  <div className="px-1">
+                    <SaveButton offeringId={row.offering.id} saved={row.saved} />
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

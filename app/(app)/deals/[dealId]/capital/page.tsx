@@ -6,7 +6,8 @@ import {
   Alert, Button, Card, CardBody, CardHeader, CardTitle, Section, Stat,
 } from '@/components/ui/primitives'
 import { CapitalStackChart } from '@/components/equity/capital-stack-chart'
-import { capitalMarketsView } from '@/services/equity/capital-stack'
+import { capitalMarketsView, structureOptions } from '@/services/equity/capital-stack'
+import { StructureAnalysis } from './structures'
 import { CreateStackButton } from './create-stack'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +27,10 @@ export default async function CapitalPage({
   const { dealId } = await params
   const { deal } = await requireDealAccess(dealId)
   const actor = await requireActor()
-  const view = await capitalMarketsView(actor, dealId)
+  const [view, structures] = await Promise.all([
+    capitalMarketsView(actor, dealId),
+    structureOptions(actor, dealId),
+  ])
   const { requirement, stack, debt, equity } = view
 
   return (
@@ -126,6 +130,13 @@ export default async function CapitalPage({
           )}
         </CardBody>
       </Section>
+
+      <StructureAnalysis
+        options={structures.options}
+        comparison={structures.comparison}
+        ratePctUsed={structures.ratePctUsed}
+        rateSource={structures.rateSource}
+      />
 
       <Card>
         <CardHeader><CardTitle>How these figures are produced</CardTitle></CardHeader>

@@ -8,7 +8,7 @@ import { ForbiddenError } from '@/lib/policy'
 import {
   acknowledgeDisclosures, recordInterest, submitCommitment, withdrawInterest,
 } from '@/services/equity/commitments'
-import { projectInvestment, runBearCase } from '@/services/equity/analysis'
+import { askOffering, projectInvestment, runBearCase } from '@/services/equity/analysis'
 import { askQuestion } from '@/services/equity/portfolio'
 import type { ActionState } from '@/app/(app)/deals/actions'
 
@@ -134,4 +134,12 @@ export async function calculateAction(
 export async function bearCaseAction(offeringId: string) {
   await requireActor()
   return runBearCase(offeringId)
+}
+
+/** Answers an investor's question from the deal record, with citations. */
+export async function askOfferingAction(offeringId: string, question: string) {
+  await requireActor()
+  const trimmed = question.trim().slice(0, 1000)
+  if (!trimmed) return null
+  return askOffering(offeringId, trimmed)
 }
