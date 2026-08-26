@@ -644,12 +644,22 @@ export function summarize(inputs: UnderwritingInputs): UnderwritingSummary {
   )
   const valueBasis = valueCandidates.length ? Math.min(...valueCandidates) : null
 
+  // Total project cost is the uses side of the table, so a refinance's payoff
+  // belongs in it. Leaving it out left a refinance's basis as closing costs
+  // alone and reported loan-to-cost in the thousands of percent.
   const cost = totalCost({
     purchasePrice: inputs.purchasePrice,
+    existingDebtPayoff: inputs.existingDebt,
     closingCosts: inputs.closingCosts,
     capexRequirement: inputs.capexRequirement,
     workingCapitalRequirement: inputs.workingCapitalRequirement,
   })
+
+  // Loan-to-cost is only meaningful against a basis that carries the deal's
+  // principal use — a price to pay or a loan to retire. Costs of transacting
+  // alone are not a project cost, and dividing by them invents a ratio.
+  const hasCostBasis =
+    (num(inputs.purchasePrice) ?? 0) > 0 || (num(inputs.existingDebt) ?? 0) > 0
 
   const ads = annualDebtService(inputs.loanAmount, inputs.ratePct, inputs.amortizationMonths)
   const yearOne = annualDebtServiceInPeriod(
@@ -675,7 +685,7 @@ export function summarize(inputs: UnderwritingInputs): UnderwritingSummary {
     loanAmount: num(inputs.loanAmount),
     valueBasis,
     ltv: ltv(inputs.loanAmount, valueBasis),
-    loanToCost: loanToCost(inputs.loanAmount, cost),
+    loanToCost: hasCostBasis ? loanToCost(inputs.loanAmount, cost) : null,
     totalCost: cost,
     equityRequirement: equityRequirement(sAndU.totalUses, {
       loanAmount: inputs.loanAmount,

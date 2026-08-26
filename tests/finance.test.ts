@@ -279,6 +279,25 @@ describe('summarize', () => {
     expect(summary.revenueGrowthPct).toBe(6.98)
   })
 
+  it('costs a refinance against the debt it retires, not its closing costs', () => {
+    const summary = summarize({
+      loanAmount: 13_900_000,
+      existingDebt: 13_550_000,
+      appraisedValue: 21_400_000,
+      closingCosts: 348_000,
+      ratePct: 6.6,
+      termMonths: 60,
+      amortizationMonths: 300,
+    })
+    expect(summary.totalCost).toBe(13_898_000)
+    expect(summary.loanToCost).toBeCloseTo(100.01, 1)
+  })
+
+  it('withholds loan-to-cost when nothing but transaction costs are known', () => {
+    const summary = summarize({ loanAmount: 13_900_000, closingCosts: 348_000 })
+    expect(summary.loanToCost).toBeNull()
+  })
+
   it('degrades gracefully to nulls when inputs are absent', () => {
     const summary = summarize({})
     expect(summary.ltv).toBeNull()
