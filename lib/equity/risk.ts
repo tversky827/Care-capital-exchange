@@ -27,7 +27,7 @@ export interface RiskInput {
   agencyLaborPct: number | null
   yearsOperating: number | null
   facilitiesOperated: number | null
-  /** Fraction of total capitalisation that is debt. */
+  /** Share of total capitalisation that is debt, as a percentage. */
   leveragePct: number | null
   targetHoldMonths: number | null
   /** Whether the deal carries an appraisal supporting the price. */
@@ -96,9 +96,9 @@ export function assessRisk(input: RiskInput): RiskResult {
 
   // --- leverage --------------------------------------------------------------
   add('leverage',
-    input.leveragePct === null ? (input.ltvPct === null ? null : scale(input.ltvPct, 55, 85)) : scale(input.leveragePct * 100, 55, 85),
+    input.leveragePct === null ? (input.ltvPct === null ? null : scale(input.ltvPct, 55, 85)) : scale(input.leveragePct, 55, 85),
     input.leveragePct !== null
-      ? `Debt is ${round(input.leveragePct * 100, 0)}% of total capitalisation.`
+      ? `Debt is ${round(input.leveragePct, 0)}% of total capitalisation.`
       : input.ltvPct !== null
         ? `Loan to value of ${round(input.ltvPct, 1)}%.`
         : 'Capital structure has not been set for this deal.')

@@ -8,9 +8,12 @@ import { readinessFor } from '@/services/underwriting'
 import { Button, Card, EmptyState, PageHeader, Progress, Table, Td, Th, Tr } from '@/components/ui/primitives'
 import { DealStatusBadge } from '@/components/deal/common'
 import { formatCurrency, formatPercent, formatRatio, formatRelative, titleize } from '@/lib/utils/format'
-import { DEAL_STATUSES } from '@/types'
+import { DEAL_STATUSES, type Offering } from '@/types'
+import { debtMarketplaceEnabled } from '@/lib/product'
+import { offeringsForDeal } from '@/services/equity/offerings'
+import { RaisesList, type RaiseRow } from './raises-list'
 
-export const metadata: Metadata = { title: 'Deals' }
+export const metadata: Metadata = { title: 'My raises' }
 
 export default async function DealsPage({
   searchParams,
@@ -25,6 +28,44 @@ export default async function DealsPage({
     where: actor.isAdmin ? {} : { company_id: actor.company.id },
     orderBy: { field: 'updated_at', dir: 'desc' },
   })
+
+  // Without the debt marketplace a "deal" is a property somebody is raising
+  // against, and the thirteen-column financing table answers questions nobody
+  // on this screen is asking. The raises view answers the three they are.
+  if (!debtMarketplaceEnabled() && !actor.isAdmin) {
+    const rows: RaiseRow[] = await Promise.all(deals.map(async (deal) => {
+      const [snapshot, offerings] = await Promise.all([
+        buildSnapshot(deal.id),
+        offeringsForDeal(deal.id),
+      ])
+      // The raise a sponsor means is the one they are running now: the live one
+      // if there is one, otherwise the most recently touched.
+      const offering = offerings.find((o) => o.status === 'live')
+        ?? [...offerings].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0]
+        ?? null
+      const [terms, investors] = await Promise.all([
+        offering
+          ? store.selectOne('offering_terms', { where: { offering_id: offering.id } })
+          : Promise.resolve(null),
+        offering
+          ? store.count('investment_commitments', {
+            where: { offering_id: offering.id, status: { in: ['submitted', 'accepted', 'funded'] } },
+          })
+          : Promise.resolve(0),
+      ])
+      return {
+        dealId: deal.id,
+        name: snapshot?.facility?.name ?? deal.name,
+        location: [snapshot?.facility?.city, snapshot?.facility?.state].filter(Boolean).join(', '),
+        beds: snapshot?.facility?.licensed_beds ?? null,
+        offering,
+        terms,
+        investors,
+        next: nextStep(deal.id, offering),
+      }
+    }))
+    return <RaisesList rows={rows} companyName={actor.company.name} />
+  }
 
   const filtered = params.status && DEAL_STATUSES.includes(params.status as never)
     ? deals.filter((deal) => deal.status === params.status)
@@ -180,4 +221,19 @@ function FilterChip({
       <span className="tnum text-ink-muted">{count}</span>
     </Link>
   )
+}
+
+/**
+ * The one thing to do next on a raise.
+ *
+ * A sponsor should never have to work out where they are in a workflow. Each
+ * state has exactly one obvious next move, and the card offers that one.
+ */
+function nextStep(dealId: string, offering: Offering | null): RaiseRow['next'] {
+  if (!offering) return { label: 'Start a raise', href: `/deals/${dealId}/equity/new`, primary: true }
+  const raise = { label: 'Open the raise', href: `/deals/${dealId}/equity`, primary: false }
+  if (offering.status === 'draft') return { ...raise, label: 'Finish the draft', primary: true }
+  if (offering.status === 'ready') return { ...raise, label: 'Publish it', primary: true }
+  if (offering.status === 'live') return { ...raise, label: 'See investors', primary: true }
+  return raise
 }

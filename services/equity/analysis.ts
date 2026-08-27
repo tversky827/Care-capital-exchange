@@ -86,18 +86,22 @@ async function analysisInput(offeringId: string): Promise<InvestmentAnalysisInpu
   })
 
   const projection = project(input)
+  // The underwriting summary already reports these as percentages — `ltv`,
+  // `debtYield` and `margin` all scale by 100 themselves. Scaling again here
+  // told investors the deal carried a 1,532% debt yield and an 880% EBITDA
+  // margin, and drove the risk score off the end of every band.
   const risk = assessRisk({
     dscr: snapshot.summary.dscr,
-    ltvPct: snapshot.summary.ltv === null ? null : snapshot.summary.ltv * 100,
-    debtYieldPct: snapshot.summary.debtYield === null ? null : snapshot.summary.debtYield * 100,
-    ebitdaMarginPct: snapshot.summary.ebitdaMargin === null ? null : snapshot.summary.ebitdaMargin * 100,
+    ltvPct: snapshot.summary.ltv,
+    debtYieldPct: snapshot.summary.debtYield,
+    ebitdaMarginPct: snapshot.summary.ebitdaMargin,
     occupancyPct: snapshot.metrics?.occupancy_pct ?? null,
     medicaidPct: snapshot.metrics?.medicaid_pct ?? null,
     agencyLaborPct: agencyShare(snapshot),
     yearsOperating: snapshot.sponsor?.years_in_healthcare ?? null,
     facilitiesOperated: snapshot.sponsor?.facilities_operated ?? null,
     leveragePct: snapshot.summary.loanAmount !== null && snapshot.summary.totalCost
-      ? snapshot.summary.loanAmount / snapshot.summary.totalCost
+      ? (snapshot.summary.loanAmount / snapshot.summary.totalCost) * 100
       : null,
     targetHoldMonths: terms?.target_hold_months ?? null,
     hasAppraisal: documents.some((d) => d.doc_type === 'appraisal'),

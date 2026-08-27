@@ -28,15 +28,21 @@ type Group = {
 /**
  * Two levels, because fifteen tabs in one row is fifteen decisions before any
  * work starts — and at 1440px the last three fell off the end of the strip
- * entirely. Six groups fit on any laptop; the detail is one click in, under the
+ * entirely. Groups fit on any laptop; the detail is one click in, under the
  * heading a person would already have guessed.
  *
  * The first tab in each group is where the group lands.
  */
-const GROUPS: Group[] = [
-  { label: 'Overview', tabs: [{ segment: '', label: 'Overview' }] },
+const INVESTMENT_GROUPS: Group[] = [
   {
-    label: 'Financials',
+    label: 'Overview',
+    tabs: [
+      { segment: '', label: 'Summary' },
+      { segment: 'analysis', label: 'Deal score' },
+    ],
+  },
+  {
+    label: 'The numbers',
     tabs: [
       { segment: 'financials', label: 'Financials' },
       { segment: 'operations', label: 'Operations' },
@@ -52,6 +58,28 @@ const GROUPS: Group[] = [
       { segment: 'issues', label: 'Issues', count: 'issues' },
     ],
   },
+  {
+    label: 'The raise',
+    tabs: [
+      { segment: 'equity', label: 'Your raise', count: 'offerings' },
+      { segment: 'capital', label: 'Capital stack' },
+    ],
+  },
+  {
+    label: 'Activity',
+    attention: 'messages',
+    tabs: [
+      { segment: 'activity', label: 'Activity' },
+      { segment: 'messages', label: 'Messages', count: 'messages' },
+    ],
+  },
+]
+
+/** The same workspace with the debt marketplace's own tabs restored. */
+const DEBT_GROUPS: Group[] = [
+  { label: 'Overview', tabs: [{ segment: '', label: 'Overview' }] },
+  INVESTMENT_GROUPS[1]!,
+  INVESTMENT_GROUPS[2]!,
   {
     label: 'Analysis',
     tabs: [
@@ -72,35 +100,30 @@ const GROUPS: Group[] = [
       { segment: 'indications', label: 'Indications', count: 'indications' },
     ],
   },
-  {
-    label: 'Activity',
-    attention: 'messages',
-    tabs: [
-      { segment: 'activity', label: 'Activity' },
-      { segment: 'messages', label: 'Messages', count: 'messages' },
-    ],
-  },
+  INVESTMENT_GROUPS[4]!,
 ]
 
 export type DealTabCounts = Record<CountKey, number>
 
 export function DealTabs({
-  dealId, counts,
+  dealId, counts, debtMarketplace = false,
 }: {
   dealId: string
   counts: DealTabCounts
+  debtMarketplace?: boolean
 }) {
+  const groups = debtMarketplace ? DEBT_GROUPS : INVESTMENT_GROUPS
   const pathname = usePathname()
   const base = `/deals/${dealId}`
   const href = (segment: string) => (segment ? `${base}/${segment}` : base)
   const isActive = (segment: string) => (segment ? pathname === href(segment) : pathname === base)
 
-  const activeGroup = GROUPS.find((group) => group.tabs.some((tab) => isActive(tab.segment)))
+  const activeGroup = groups.find((group) => group.tabs.some((tab) => isActive(tab.segment)))
 
   return (
     <div className="no-print">
       <nav className="flex gap-0.5 overflow-x-auto border-b border-line" aria-label="Deal sections">
-        {GROUPS.map((group) => {
+        {groups.map((group) => {
           const first = group.tabs[0]
           const active = group === activeGroup
           const attention = group.attention ? counts[group.attention] : 0

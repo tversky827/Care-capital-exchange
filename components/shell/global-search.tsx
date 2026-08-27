@@ -84,7 +84,7 @@ export function GlobalSearch() {
             setOpen(true)
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Search deals, documents, lenders…"
+          placeholder="Search properties, raises, documents…"
           aria-label="Global search"
           className="h-8 w-full border border-line bg-canvas pl-8 pr-8 text-[13px] text-ink placeholder:text-ink-muted rounded-[3px] focus:border-accent focus:bg-surface"
         />

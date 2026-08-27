@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { Plus } from 'lucide-react'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { debtMarketplaceEnabled } from '@/lib/product'
 import { borrowerAnalytics } from '@/services/analytics'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { readinessFor } from '@/services/underwriting'
@@ -27,6 +28,10 @@ export default async function DashboardPage() {
   const actor = await requireActor()
   if (actor.isLender) redirect('/lender')
   if (actor.isAdmin) redirect('/admin')
+  if (actor.isInvestor) redirect('/investments')
+  // The portfolio dashboard reports on debt raised. Without the debt
+  // marketplace it has nothing to say that the raises list does not say better.
+  if (!debtMarketplaceEnabled()) redirect('/deals')
 
   const store = await db()
   const deals = await store.select('deals', {

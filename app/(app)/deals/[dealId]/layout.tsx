@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
 import { loadDealForActor } from '@/lib/access'
 import { ForbiddenError } from '@/lib/policy'
+import { debtMarketplaceEnabled } from '@/lib/product'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { readinessFor } from '@/services/underwriting'
 import { Badge, Button, Progress } from '@/components/ui/primitives'
@@ -45,6 +46,7 @@ export default async function DealLayout({
   const snapshot = await buildSnapshot(dealId)
   if (!snapshot) notFound()
 
+  const debtMarketplace = debtMarketplaceEnabled()
   const readiness = await readinessFor(dealId)
 
   const store = await db()
@@ -64,7 +66,9 @@ export default async function DealLayout({
         <div className="flex flex-wrap items-start justify-between gap-4 px-4 py-3.5">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <Link href="/deals" className="text-[12px] text-ink-muted hover:text-ink">Deals</Link>
+              <Link href="/deals" className="text-[12px] text-ink-muted hover:text-ink">
+                {debtMarketplace ? 'Deals' : 'My raises'}
+              </Link>
               <span className="text-[12px] text-ink-muted">/</span>
               <span className="tnum text-[12px] font-medium text-ink-secondary">{deal.reference}</span>
               {deal.is_demo ? <Badge tone="warning">Demo</Badge> : null}
@@ -82,13 +86,15 @@ export default async function DealLayout({
           <div className="flex flex-wrap items-center gap-2">
             <DealStatusBadge status={deal.status} />
             <Link href={`/deals/${dealId}/ask`}>
-              <Button size="sm">Ask the deal</Button>
+              <Button size="sm">Ask a question</Button>
             </Link>
-            <Link href={`/deals/${dealId}/distribute`}>
-              <Button size="sm" variant="primary">
-                {deal.distributed_at ? 'Manage distribution' : 'Distribute'}
-              </Button>
-            </Link>
+            {debtMarketplace ? (
+              <Link href={`/deals/${dealId}/distribute`}>
+                <Button size="sm" variant="primary">
+                  {deal.distributed_at ? 'Manage distribution' : 'Distribute'}
+                </Button>
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -113,6 +119,7 @@ export default async function DealLayout({
 
       <DealTabs
         dealId={dealId}
+        debtMarketplace={debtMarketplace}
         counts={{
           issues: openIssues,
           matches: matchCount,

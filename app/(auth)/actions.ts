@@ -9,6 +9,7 @@ import {
 import { clearSessionCookie, getActor } from '@/lib/auth/session'
 import { recordAudit } from '@/services/audit'
 import type { Actor } from '@/lib/auth/session'
+import { debtMarketplaceEnabled } from '@/lib/product'
 
 export interface AuthState {
   error?: string
@@ -23,10 +24,18 @@ export interface AuthState {
   values?: Record<string, string>
 }
 
+/**
+ * Where a person lands after signing in.
+ *
+ * Every role goes to the screen that role actually works from. An investor was
+ * previously dropped on the sponsor dashboard, which showed them a portfolio
+ * they do not own and none of the offerings they came to look at.
+ */
 function landingFor(actor: Actor): string {
   if (actor.isAdmin) return '/admin'
   if (actor.isLender) return '/lender'
-  return '/dashboard'
+  if (actor.isInvestor) return '/investments'
+  return debtMarketplaceEnabled() ? '/dashboard' : '/deals'
 }
 
 export async function loginAction(_prev: AuthState, formData: FormData): Promise<AuthState> {

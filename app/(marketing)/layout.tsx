@@ -32,7 +32,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
           </nav>
           <div className="ml-auto flex items-center gap-2">
             {actor ? (
-              <Link href={actor.isLender ? '/lender' : actor.isAdmin ? '/admin' : '/dashboard'}>
+              <Link href={actor.isLender ? '/lender' : actor.isAdmin ? '/admin' : actor.isInvestor ? '/investments' : '/deals'}>
                 <Button variant="primary" size="sm">Open dashboard</Button>
               </Link>
             ) : (

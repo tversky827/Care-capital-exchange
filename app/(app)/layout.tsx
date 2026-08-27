@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getActor } from '@/lib/auth/session'
+import { isEnabled } from '@/lib/flags'
 import { db } from '@/db'
 import { TopBar } from '@/components/shell/topbar'
 import { MobileNav, Sidebar } from '@/components/shell/sidebar'
@@ -21,15 +22,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ? 'admin'
     : actor.isLender ? 'lender' : actor.isInvestor ? 'investor' : 'borrower'
 
+  const debtMarketplace = isEnabled('DEBT_MARKETPLACE_ENABLED')
+
   const store = await db()
   const demoDeals = await store.count('deals', { where: { is_demo: true } })
 
   return (
     <div className="flex min-h-screen bg-canvas">
-      <Sidebar role={role} />
+      <Sidebar role={role} debtMarketplace={debtMarketplace} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar actor={actor} />
-        <MobileNav role={role} />
+        <MobileNav role={role} debtMarketplace={debtMarketplace} />
         {demoDeals > 0 ? <DemoBanner className="no-print" /> : null}
         <main className="min-w-0 flex-1 px-4 py-5 lg:px-6 lg:py-6">{children}</main>
       </div>

@@ -18,6 +18,18 @@
 export const FLAGS = {
   /** The equity marketplace as a whole. Off means the product is debt-only. */
   EQUITY_MARKETPLACE_ENABLED: true,
+  /**
+   * The debt side: the lender marketplace, lender matching, indications and
+   * the lender directory.
+   *
+   * Off by default. The product this deployment presents is the private
+   * healthcare investment marketplace, and the debt engine sits underneath it
+   * as underwriting — a raise is still analysed against the debt it carries,
+   * and every figure an investor sees still comes from it. What the flag turns
+   * off is the debt *marketplace*: the surfaces where a borrower shops a loan
+   * to lenders. Turning it back on restores them without a rebuild.
+   */
+  DEBT_MARKETPLACE_ENABLED: false,
   /** Investors may register and complete onboarding. */
   INVESTOR_ONBOARDING_ENABLED: true,
   /** Investors may record a non-binding commitment against an offering. */

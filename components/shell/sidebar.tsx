@@ -6,9 +6,15 @@ import { Logo } from '@/components/brand'
 import { cn } from '@/lib/utils/cn'
 import { navForRole, SETTINGS_ITEM, type NavRole } from './nav-config'
 
-export function Sidebar({ role, footer }: { role: NavRole; footer?: React.ReactNode }) {
+export function Sidebar({
+  role, debtMarketplace = false, footer,
+}: {
+  role: NavRole
+  debtMarketplace?: boolean
+  footer?: React.ReactNode
+}) {
   const pathname = usePathname()
-  const groups = navForRole(role)
+  const groups = navForRole(role, debtMarketplace)
 
   const isActive = (href: string, prefix?: boolean) =>
     prefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href
@@ -22,7 +28,7 @@ export function Sidebar({ role, footer }: { role: NavRole; footer?: React.ReactN
       <nav className="flex-1 overflow-y-auto px-2 py-4">
         {groups.map((group) => (
           <div key={group.label} className="mb-5">
-            <p className="eyebrow px-2 pb-1.5">{group.label}</p>
+            {group.label ? <p className="eyebrow px-2 pb-1.5">{group.label}</p> : null}
             <ul className="space-y-0.5">
               {group.items.map((item) => (
                 <li key={item.href}>
@@ -65,9 +71,9 @@ export function Sidebar({ role, footer }: { role: NavRole; footer?: React.ReactN
 }
 
 /** Compact horizontal navigation used below the top bar on small screens. */
-export function MobileNav({ role }: { role: NavRole }) {
+export function MobileNav({ role, debtMarketplace = false }: { role: NavRole; debtMarketplace?: boolean }) {
   const pathname = usePathname()
-  const items = navForRole(role).flatMap((group) => group.items)
+  const items = navForRole(role, debtMarketplace).flatMap((group) => group.items)
   return (
     <nav className="no-print flex gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-1.5 lg:hidden">
       {items.map((item) => {
