@@ -3,6 +3,8 @@ import { isAvailable } from '@/lib/flags'
 import { OfferingCard } from '@/components/equity/offering-card'
 import { Alert, EmptyState, PageHeader } from '@/components/ui/primitives'
 import { searchOfferings, type OfferingSearch } from '@/services/equity/matching'
+import { db } from '@/db'
+import { CURRENT_NDA } from '@/lib/equity/nda'
 import { MarketplaceFilters, SaveButton } from './filters'
 
 export const dynamic = 'force-dynamic'
@@ -64,6 +66,16 @@ export default async function InvestmentsPage({
   // recency otherwise. Never by size of raise, and never by who is paying.
   const sorted = [...rows].sort((a, b) => (b.match?.score ?? -1) - (a.match?.score ?? -1))
 
+  // Which of these this viewer has already signed for. One query rather than
+  // one per card: an anonymized listing keeps its descriptor in the list until
+  // the agreement is signed, and takes its real name afterwards.
+  const store = await db()
+  const signed = new Set(
+    (await store.select('nda_acceptances', {
+      where: { company_id: actor.company.id, nda_version: CURRENT_NDA.version },
+    })).map((row) => row.offering_id),
+  )
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -95,6 +107,7 @@ export default async function InvestmentsPage({
                   deal={row.deal}
                   facility={row.facility}
                   match={row.match}
+                  revealIdentity={signed.has(row.offering.id) || row.deal.company_id === actor.company.id || actor.isAdmin}
                   committedPct={
                     row.offering.target_raise && row.offering.target_raise > 0
                       ? row.offering.committed_amount / row.offering.target_raise

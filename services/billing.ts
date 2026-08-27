@@ -1,118 +1,63 @@
 import 'server-only'
 import { db } from '@/db'
-import { recordAudit } from './audit'
-import type { Actor } from '@/lib/auth/session'
-import type { BillingEvent, Subscription } from '@/types'
+import type { BillingEvent } from '@/types'
 
 /**
  * Billing.
  *
- * Plans and fees are configuration, not code: the platform can run a
- * subscription model, a transaction-fee model, a success-fee model, or a
- * combination, without a schema change. No pricing is hard-coded into any
- * business logic — everything reads `PLAN_CATALOG` and `FEE_SCHEDULE`.
+ * The platform charges on outcomes only: a fee when capital actually funds,
+ * and nothing otherwise. There is no subscription, no seat count and no
+ * monthly minimum — an operator can put a raise up and take it all the way to
+ * a commitment without being charged, and an investor is never charged at all.
+ *
+ * Fees are configuration, not code. No pricing is hard-coded into any business
+ * logic; everything reads `FEE_SCHEDULE`, so the rate can change without a
+ * schema change or a deployment that touches logic.
  *
  * The provider interface is Stripe-shaped, with a development implementation
  * that records the same events locally so the rest of the product is
  * exercisable without payment credentials.
  */
 
-export type PlanAudience = 'borrower' | 'lender'
-
-export interface Plan {
-  key: string
-  name: string
-  audience: PlanAudience
-  monthlyUsd: number | null
-  annualUsd: number | null
-  seats: number
-  features: string[]
-  highlight?: boolean
-}
-
-export const PLAN_CATALOG: Plan[] = [
-  {
-    key: 'borrower_standard',
-    name: 'Borrower',
-    audience: 'borrower',
-    monthlyUsd: 0,
-    annualUsd: 0,
-    seats: 3,
-    features: [
-      'Unlimited deal submissions',
-      'AI document extraction and reconciliation',
-      'Deterministic underwriting metrics',
-      'Lender matching and distribution',
-      'Financing indication comparison',
-      'Secure data room',
-    ],
-  },
-  {
-    key: 'borrower_pro',
-    name: 'Borrower Pro',
-    audience: 'borrower',
-    monthlyUsd: 750,
-    annualUsd: 7_500,
-    seats: 10,
-    highlight: true,
-    features: [
-      'Everything in Borrower',
-      'Priority underwriting review',
-      'Institutional credit memo with source citations',
-      'Custom lender targeting',
-      'Portfolio analytics across facilities',
-      'Named transaction support',
-    ],
-  },
-  {
-    key: 'lender_professional',
-    name: 'Lender Professional',
-    audience: 'lender',
-    monthlyUsd: 1_200,
-    annualUsd: 12_000,
-    seats: 5,
-    features: [
-      'Matched opportunity flow inside your lending box',
-      'Full marketplace access',
-      'Standardised financing packages and credit memos',
-      'Pipeline management and internal notes',
-      'Deal alerts and saved searches',
-    ],
-  },
-  {
-    key: 'lender_enterprise',
-    name: 'Lender Enterprise',
-    audience: 'lender',
-    monthlyUsd: null,
-    annualUsd: null,
-    seats: 50,
-    features: [
-      'Everything in Lender Professional',
-      'Multiple lending boxes by team or region',
-      'API access for pipeline and indications',
-      'SSO and advanced access controls',
-      'Custom reporting and benchmarking',
-    ],
-  },
-]
+/** Who a fee falls on. Investors are never charged. */
+export type FeePayer = 'sponsor' | 'lender'
 
 export interface FeeRule {
   key: string
   label: string
-  /** Basis points of the funded loan amount. */
+  /** What the fee is taken against, in plain words. */
+  basis: string
+  /** Basis points of the funded amount. 100 bp = 1%. */
   basisPoints: number
-  appliesTo: PlanAudience
+  appliesTo: FeePayer
   capUsd: number | null
+  detail: string
 }
 
 export const FEE_SCHEDULE: FeeRule[] = [
-  { key: 'borrower_success_fee', label: 'Borrower success fee on funded capital', basisPoints: 50, appliesTo: 'borrower', capUsd: 75_000 },
-  { key: 'lender_transaction_fee', label: 'Lender transaction fee on funded capital', basisPoints: 25, appliesTo: 'lender', capUsd: 50_000 },
+  {
+    key: 'sponsor_success_fee',
+    label: 'Success fee on capital raised',
+    basis: 'equity that actually funds',
+    basisPoints: 200,
+    appliesTo: 'sponsor',
+    capUsd: null,
+    detail:
+      'Charged to the operator when a raise closes, on the capital that funded. Nothing is charged on a raise that does not close, and nothing is charged while it is open.',
+  },
+  {
+    // Kept for the debt marketplace, which is off by default. It is listed
+    // here rather than deleted so turning that product back on does not
+    // require rediscovering what it charged.
+    key: 'lender_transaction_fee',
+    label: 'Lender transaction fee on funded debt',
+    basis: 'debt that actually funds',
+    basisPoints: 25,
+    appliesTo: 'lender',
+    capUsd: 50_000,
+    detail: 'Applies only where the debt marketplace is switched on.',
+  },
 ]
-
-export function planByKey(key: string): Plan | undefined {
-  return PLAN_CATALOG.find((plan) => plan.key === key)
-}
 
 export function computeFee(ruleKey: string, fundedAmount: number): number {
   const rule = FEE_SCHEDULE.find((r) => r.key === ruleKey)
@@ -121,25 +66,18 @@ export function computeFee(ruleKey: string, fundedAmount: number): number {
   return Math.round((rule.capUsd === null ? raw : Math.min(raw, rule.capUsd)) * 100) / 100
 }
 
-export interface CheckoutSession {
-  url: string | null
-  externalId: string
-  provider: string
-}
-
 export interface BillingProvider {
   readonly name: string
-  createCheckout(companyId: string, planKey: string, seats: number): Promise<CheckoutSession>
-  cancel(subscriptionId: string): Promise<void>
+  /** Raises an invoice for a fee that has already been earned. */
+  invoice(companyId: string, amountUsd: number, description: string): Promise<{ externalId: string }>
 }
 
-/** Development provider: records the subscription without taking payment. */
+/** Development provider: records the fee without taking payment. */
 class LocalBillingProvider implements BillingProvider {
   readonly name = 'local'
-  async createCheckout(companyId: string, planKey: string): Promise<CheckoutSession> {
-    return { url: null, externalId: `local_${companyId}_${planKey}`, provider: this.name }
+  async invoice(companyId: string): Promise<{ externalId: string }> {
+    return { externalId: `local_${companyId}` }
   }
-  async cancel(): Promise<void> {}
 }
 
 let provider: BillingProvider = new LocalBillingProvider()
@@ -152,97 +90,44 @@ export function getBillingProvider(): BillingProvider {
   return provider
 }
 
-export async function startSubscription(actor: Actor, planKey: string, seats?: number): Promise<Subscription> {
-  const plan = planByKey(planKey)
-  if (!plan) throw new Error(`Unknown plan: ${planKey}`)
+/**
+ * Records the fee due when a raise closes.
+ *
+ * Called once, when an offering moves to closed, against the capital that
+ * actually funded — not the target, and not what was committed but never
+ * accepted. Recording it is all this does: charging is the provider's job, and
+ * on a raise that funded nothing there is nothing to record.
+ */
+export async function recordRaiseFee(
+  offeringId: string,
+  companyId: string,
+  dealId: string,
+  fundedAmount: number,
+): Promise<BillingEvent | null> {
+  const fee = computeFee('sponsor_success_fee', fundedAmount)
+  if (fee <= 0) return null
 
   const store = await db()
-  const checkout = await provider.createCheckout(actor.company.id, planKey, seats ?? plan.seats)
-  const existing = await store.selectOne('subscriptions', { where: { company_id: actor.company.id } })
+  // A raise closes once. A second event for the same offering would be a
+  // second invoice for the same capital.
+  const existing = await store.select('billing_events', { where: { company_id: companyId } })
+  if (existing.some((event) => event.metadata?.offeringId === offeringId)) return null
 
-  const periodEnd = new Date()
-  periodEnd.setUTCMonth(periodEnd.getUTCMonth() + 1)
-
-  const payload = {
-    plan_key: planKey,
-    status: 'active' as const,
-    seats: seats ?? plan.seats,
-    current_period_end: periodEnd.toISOString(),
-    external_id: checkout.externalId,
-  }
-
-  const subscription = existing
-    ? await store.update('subscriptions', existing.id, payload)
-    : await store.insert('subscriptions', { company_id: actor.company.id, ...payload } as Omit<Subscription, 'id' | 'created_at' | 'updated_at'>)
-
-  await store.insert('billing_events', {
-    company_id: actor.company.id,
-    deal_id: null,
-    kind: 'subscription_created',
-    amount_usd: plan.monthlyUsd ?? 0,
-    description: `${plan.name} subscription started (${payload.seats} seats).`,
-    external_id: checkout.externalId,
-    metadata: { planKey, provider: checkout.provider },
+  return store.insert('billing_events', {
+    company_id: companyId,
+    deal_id: dealId,
+    kind: 'success_fee',
+    amount_usd: fee,
+    description: `Success fee on ${formatMillions(fundedAmount)} of equity raised.`,
+    external_id: null,
+    metadata: { offeringId, fundedAmount, ruleKey: 'sponsor_success_fee' },
   } as Omit<BillingEvent, 'id' | 'created_at'>)
-
-  await recordAudit({
-    actor,
-    action: 'billing.subscription_started',
-    entityType: 'subscription',
-    entityId: subscription.id,
-    summary: `${actor.company.name} started the ${plan.name} plan.`,
-    metadata: { planKey, seats: payload.seats, provider: checkout.provider },
-  })
-
-  return subscription
 }
 
-/** Records the fee due when a deal funds. Charging is the provider's job. */
-export async function recordFundingFees(dealId: string, fundedAmount: number): Promise<BillingEvent[]> {
-  const store = await db()
-  const deal = await store.findById('deals', dealId)
-  if (!deal) return []
-
-  const events: BillingEvent[] = []
-  const borrowerFee = computeFee('borrower_success_fee', fundedAmount)
-  if (borrowerFee > 0) {
-    events.push(
-      await store.insert('billing_events', {
-        company_id: deal.company_id,
-        deal_id: dealId,
-        kind: 'success_fee',
-        amount_usd: borrowerFee,
-        description: `Success fee on ${(fundedAmount / 1_000_000).toFixed(2)}M of funded capital.`,
-        external_id: null,
-        metadata: { fundedAmount, ruleKey: 'borrower_success_fee' },
-      } as Omit<BillingEvent, 'id' | 'created_at'>),
-    )
-  }
-
-  const selected = await store.selectOne('indications', { where: { deal_id: dealId, status: 'selected' } })
-  if (selected) {
-    const lender = await store.findById('lenders', selected.lender_id)
-    const lenderFee = computeFee('lender_transaction_fee', fundedAmount)
-    if (lender && lenderFee > 0) {
-      events.push(
-        await store.insert('billing_events', {
-          company_id: lender.company_id,
-          deal_id: dealId,
-          kind: 'transaction_fee',
-          amount_usd: lenderFee,
-          description: `Transaction fee on ${(fundedAmount / 1_000_000).toFixed(2)}M funded.`,
-          external_id: null,
-          metadata: { fundedAmount, ruleKey: 'lender_transaction_fee' },
-        } as Omit<BillingEvent, 'id' | 'created_at'>),
-      )
-    }
-  }
-  return events
-}
-
-export async function subscriptionFor(companyId: string): Promise<Subscription | null> {
-  const store = await db()
-  return store.selectOne('subscriptions', { where: { company_id: companyId } })
+function formatMillions(amount: number): string {
+  return amount >= 1_000_000
+    ? `$${(amount / 1_000_000).toFixed(2)}M`
+    : `$${Math.round(amount / 1_000).toLocaleString('en-US')}K`
 }
 
 export async function billingHistory(companyId: string): Promise<BillingEvent[]> {

@@ -8,6 +8,7 @@ import { isAvailable } from '@/lib/flags'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { defaultTiers } from '@/lib/equity/waterfall'
 import { recordAudit } from '../audit'
+import { recordRaiseFee } from '../billing'
 import { notify } from '../notifications'
 import type { Actor } from '@/lib/auth/session'
 import type {
@@ -425,6 +426,17 @@ export async function setOfferingStatus(
     status,
     closed_at: status === 'closed' ? new Date().toISOString() : offering.closed_at,
   } as Partial<Offering>)
+
+  // The platform's only revenue event. It is taken on capital that actually
+  // funded rather than on the target or on what was merely committed, so a
+  // raise that closes short is billed on what it raised and a raise that
+  // closes empty is billed nothing.
+  if (status === 'closed' && offering.status !== 'closed') {
+    const funded = (await store.select('investment_commitments', {
+      where: { offering_id: offeringId, status: { in: ['accepted', 'funded'] } },
+    })).reduce((total, commitment) => total + commitment.amount, 0)
+    await recordRaiseFee(offeringId, offering.company_id, offering.deal_id, funded)
+  }
 
   await recordAudit({
     actor, action: 'offering.status_changed', entityType: 'offering', entityId: offeringId,

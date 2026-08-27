@@ -2,8 +2,10 @@ import 'server-only'
 import { db } from '@/db'
 import type { Actor } from '@/lib/auth/session'
 import {
-  authorize, canViewDeal, ForbiddenError, isMarketplaceVisible, type DealAccessContext, type PolicySubject,
+  authorize, canViewDeal, canViewOfferingDocument, ForbiddenError, isMarketplaceVisible,
+  type DealAccessContext, type PolicySubject,
 } from '@/lib/policy'
+import { CURRENT_NDA } from '@/lib/equity/nda'
 import type { Deal, DealDistribution, DocumentRecord } from '@/types'
 
 /** Projects a request actor onto the pure policy subject. */
@@ -73,6 +75,47 @@ export async function documentContext(
   })
   return {
     distribution: await distributionFor(actor, document.deal_id),
+    offeringRelease: await offeringReleasesDocument(actor, document),
     grant: grant ? { can_view: grant.can_view, can_download: grant.can_download, expires_at: grant.expires_at } : null,
   }
+}
+
+/**
+ * Whether an offering has released this document to the actor's organisation.
+ *
+ * Three things have to be true, and all three are about *this* offering: it
+ * publishes the document, the actor's engagement has reached the level it was
+ * published at, and the actor has signed its confidentiality agreement. An
+ * investor with several offerings open therefore reaches exactly the documents
+ * each one has released to them, and no others.
+ *
+ * The download route is the only place bytes are served, and it consults this
+ * through `canViewDocument`. A data room listing that leaks a link is
+ * therefore still not a way to read the file.
+ */
+async function offeringReleasesDocument(actor: Actor, document: DocumentRecord): Promise<boolean> {
+  if (actor.company.type !== 'investor') return false
+  const store = await db()
+  const entries = await store.select('offering_documents', { where: { document_id: document.id } })
+  if (entries.length === 0) return false
+
+  for (const entry of entries) {
+    const offering = await store.findById('offerings', entry.offering_id)
+    if (!offering || offering.deal_id !== document.deal_id) continue
+
+    const signed = await store.select('nda_acceptances', {
+      where: { offering_id: offering.id, company_id: actor.company.id, nda_version: CURRENT_NDA.version },
+    })
+    if (signed.length === 0) continue
+
+    const interest = actor.investor
+      ? await store.selectOne('investment_interests', {
+        where: { offering_id: offering.id, investor_id: actor.investor.id },
+      })
+      : null
+    if (canViewOfferingDocument(subjectOf(actor), offering, entry.access_level, interest?.stage ?? null)) {
+      return true
+    }
+  }
+  return false
 }

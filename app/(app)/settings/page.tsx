@@ -3,7 +3,7 @@ import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
 import { subjectOf } from '@/lib/access'
 import { canManageCompany } from '@/lib/policy'
-import { billingHistory, PLAN_CATALOG, subscriptionFor } from '@/services/billing'
+import { billingHistory, FEE_SCHEDULE } from '@/services/billing'
 import { Alert, Badge, CardBody, PageHeader, Section, Table, Td, Th, Tr } from '@/components/ui/primitives'
 import { CompanyForm, NotificationForm, PasswordForm, ProfileForm } from './forms'
 import { formatCurrency, formatDate, titleize } from '@/lib/utils/format'
@@ -14,15 +14,14 @@ export default async function SettingsPage() {
   const actor = await requireActor()
   const store = await db()
 
-  const [members, users, subscription, billing] = await Promise.all([
+  const [members, users, billing] = await Promise.all([
     store.select('company_members', { where: { company_id: actor.company.id } }),
     store.select('users', {}),
-    subscriptionFor(actor.company.id),
     billingHistory(actor.company.id),
   ])
 
   const canManage = canManageCompany(subjectOf(actor), actor.company.id)
-  const plan = subscription ? PLAN_CATALOG.find((entry) => entry.key === subscription.plan_key) : null
+  const successFee = FEE_SCHEDULE.find((fee) => fee.appliesTo === 'sponsor')!
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -110,24 +109,16 @@ export default async function SettingsPage() {
         </Table>
       </Section>
 
-      <Section title="Plan and billing">
+      <Section
+        title="Billing"
+        description="There is no subscription on this account. Nothing is charged until capital funds."
+      >
         <CardBody>
-          {plan ? (
-            <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line pb-3">
-              <div>
-                <p className="text-[14px] font-semibold text-ink">{plan.name}</p>
-                <p className="text-[12px] text-ink-muted">
-                  {subscription?.seats} seats ·{' '}
-                  {subscription?.current_period_end ? `renews ${formatDate(subscription.current_period_end)}` : 'no renewal date'}
-                </p>
-              </div>
-              <Badge tone={subscription?.status === 'active' ? 'positive' : 'warning'}>
-                {titleize(subscription?.status ?? 'none')}
-              </Badge>
-            </div>
-          ) : (
-            <p className="text-[13px] text-ink-secondary">No subscription on this organisation.</p>
-          )}
+          <p className="text-[13px] leading-relaxed text-ink-secondary">
+            {(successFee.basisPoints / 100).toFixed(successFee.basisPoints % 100 === 0 ? 0 : 2)}% of
+            capital that actually funds, charged to the operator when a raise closes. Nothing is
+            charged on a raise that does not close, and an investor is never charged.
+          </p>
 
           {billing.length > 0 ? (
             <Table className="mt-3">
@@ -143,12 +134,14 @@ export default async function SettingsPage() {
                 ))}
               </tbody>
             </Table>
-          ) : null}
+          ) : (
+            <p className="mt-3 text-[13px] text-ink-muted">Nothing has been billed to this account.</p>
+          )}
 
           <Alert tone="neutral" className="mt-3">
-            No payment provider is configured in this environment, so subscriptions and fees are
-            recorded locally rather than charged. The billing interface is Stripe-shaped; wiring a
-            provider does not change any other part of the product.
+            No payment provider is configured in this environment, so fees are recorded locally
+            rather than charged. The billing interface is Stripe-shaped; wiring a provider does not
+            change any other part of the product.
           </Alert>
         </CardBody>
       </Section>

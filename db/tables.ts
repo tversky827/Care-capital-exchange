@@ -16,7 +16,7 @@ import type {
   CapitalSource, CapitalStack, ComplianceReview, DisclosureAcknowledgement, DistributionEvent,
   InvestmentCommitment, InvestmentDistribution, InvestmentInterest, InvestmentPosition,
   InvestmentScenario, InvestmentTransaction, InvestorAnswer, InvestorMatch, InvestorPreferences,
-  InvestorProfile, InvestorQuestion, InvestorUpdate, InvestorVerification, Offering,
+  InvestorProfile, InvestorQuestion, InvestorUpdate, InvestorVerification, NdaAcceptance, Offering,
   OfferingDisclosure, OfferingDocument, OfferingEligibility, OfferingTerms, OfferingVersion,
   RiskAssessment, SavedInvestment, TaxDocument, WaterfallStructure, WaterfallTier,
 } from '@/types/equity'
@@ -76,6 +76,7 @@ export interface Tables {
   offering_documents: OfferingDocument
   offering_versions: OfferingVersion
   disclosure_acknowledgements: DisclosureAcknowledgement
+  nda_acceptances: NdaAcceptance
   investment_interests: InvestmentInterest
   investment_commitments: InvestmentCommitment
   investment_transactions: InvestmentTransaction
@@ -116,7 +117,7 @@ export const TABLE_NAMES: TableName[] = [
   'distribution_events', 'investment_distributions', 'waterfall_structures', 'waterfall_tiers',
   'investor_updates', 'tax_documents', 'investor_questions', 'investor_answers',
   'risk_assessments', 'investment_scenarios', 'capital_stacks', 'capital_sources',
-  'investor_matches', 'saved_investments', 'compliance_reviews',
+  'investor_matches', 'saved_investments', 'compliance_reviews', 'nda_acceptances',
 ]
 
 /** Tables that must never be updated or deleted through the ordinary data API. */
@@ -125,4 +126,7 @@ export const APPEND_ONLY_TABLES: TableName[] = [
   // An acknowledgement is evidence that a person accepted specific words at a
   // specific time. Editing one would destroy the only thing it is for.
   'disclosure_acknowledgements', 'offering_versions',
+  // The same reasoning: a countersigned agreement that can be edited is not
+  // evidence of anything.
+  'nda_acceptances',
 ]

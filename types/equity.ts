@@ -187,6 +187,36 @@ export interface DisclosureAcknowledgement {
   created_at: ISODate
 }
 
+/**
+ * A signed confidentiality agreement between a viewer and one offering.
+ *
+ * Recorded per offering rather than once per account: an operator's consent to
+ * disclose is given about their own raise, and a person who agreed to keep one
+ * facility's figures confidential has not agreed anything about another's.
+ *
+ * Append-only, and stores the exact text version accepted rather than a
+ * pointer to "the current NDA" — the only question this record ever has to
+ * answer is what a specific person agreed to on a specific day, and a pointer
+ * to text that has since changed cannot answer it.
+ */
+export interface NdaAcceptance {
+  id: UUID
+  offering_id: UUID
+  company_id: UUID
+  user_id: UUID
+  /** Null where the viewer's company has no investor profile. */
+  investor_id: UUID | null
+  /** Identifier of the agreement text, e.g. "mutual-nda-v1". */
+  nda_version: string
+  /** The name the person typed as their signature. */
+  signed_name: string
+  accepted_at: ISODate
+  /** Coarse request metadata, retained because acceptance is evidentiary. */
+  ip_address: string | null
+  user_agent: string | null
+  created_at: ISODate
+}
+
 /** Access tiers for offering material. Ordered from least to most privileged. */
 export const OFFERING_ACCESS_LEVELS = [
   'public_teaser', 'verified_investor', 'interested_investor',

@@ -9,6 +9,7 @@ import {
   acknowledgeDisclosures, recordInterest, submitCommitment, withdrawInterest,
 } from '@/services/equity/commitments'
 import { askOffering, projectInvestment, runBearCase } from '@/services/equity/analysis'
+import { acceptNda, requireNda } from '@/services/equity/nda'
 import { askQuestion } from '@/services/equity/portfolio'
 import type { ActionState } from '@/app/(app)/deals/actions'
 
@@ -121,24 +122,54 @@ export async function askQuestionAction(
   }
 }
 
+/**
+ * Records acceptance of the offering's confidentiality agreement.
+ *
+ * Everything below this line returns figures from the operator's own record,
+ * so every one of them asks for the agreement first. A server action is a
+ * public HTTP endpoint: gating only the page that calls it would gate nothing.
+ */
+export async function acceptNdaAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const offeringId = String(formData.get('offeringId') ?? '')
+  const signedName = String(formData.get('signedName') ?? '')
+  try {
+    const actor = await requireActor()
+    const requestHeaders = await headers()
+    await acceptNda(actor, offeringId, signedName, {
+      ip: requestHeaders.get('x-forwarded-for'),
+      userAgent: requestHeaders.get('user-agent'),
+    })
+    revalidatePath(`/investments/${offeringId}`)
+    return { success: 'Agreement signed.' }
+  } catch (error) {
+    return failure(error)
+  }
+}
+
 /** The commitment calculator. Read-only: it computes, it does not commit. */
 export async function calculateAction(
   offeringId: string,
   amount: number,
 ): Promise<Awaited<ReturnType<typeof projectInvestment>>> {
-  await requireActor()
+  const actor = await requireActor()
+  await requireNda(actor, offeringId)
   return projectInvestment(offeringId, amount)
 }
 
 /** Runs the downside scenario for an offering. */
 export async function bearCaseAction(offeringId: string) {
-  await requireActor()
+  const actor = await requireActor()
+  await requireNda(actor, offeringId)
   return runBearCase(offeringId)
 }
 
 /** Answers an investor's question from the deal record, with citations. */
 export async function askOfferingAction(offeringId: string, question: string) {
-  await requireActor()
+  const actor = await requireActor()
+  await requireNda(actor, offeringId)
   const trimmed = question.trim().slice(0, 1000)
   if (!trimmed) return null
   return askOffering(offeringId, trimmed)

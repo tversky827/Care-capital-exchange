@@ -5,6 +5,7 @@ import { defaultTiers } from '@/lib/equity/waterfall'
 import { ownershipShare } from '@/lib/equity/returns'
 import { round } from '@/lib/finance/calculations'
 import type { Company, CompanyMember, Deal, User } from '@/types'
+import { CURRENT_NDA } from '@/lib/equity/nda'
 import type {
   DistributionEvent, InvestmentCommitment, InvestmentDistribution, InvestmentInterest,
   InvestmentPosition, InvestorPreferences, InvestorProfile, InvestorUpdate, InvestorVerification,
@@ -145,10 +146,49 @@ const INVESTORS: InvestorFixture[] = [
     positions: ['common_equity'], riskTolerance: 'moderate',
     targetReturnMin: 14, minHoldMonths: 36, maxHoldMonths: 72, maxLeveragePct: 0.75,
   },
+  {
+    slug: 'greenfell', company: 'Greenfell Senior Capital', displayName: 'Greenfell Senior Capital',
+    email: 'ic@greenfell.demo', name: 'Marguerite Vance', title: 'Managing Director',
+    investorType: 'institution', state: 'WI', city: 'Milwaukee',
+    yearsInvesting: 19, healthcare: true, typicalInvestment: 600_000,
+    assetTypes: ['alf', 'memory_care'], states: ['WI', 'MI', 'IL', 'ID', 'KS'],
+    positions: ['common_equity', 'preferred_equity'], riskTolerance: 'moderate',
+    targetReturnMin: 13, minHoldMonths: 48, maxHoldMonths: 96, maxLeveragePct: 0.7,
+  },
+  {
+    slug: 'holloway', company: 'Holloway & Rees', displayName: 'Holloway & Rees',
+    email: 'alts@hollowayrees.demo', name: 'Desmond Rees', title: 'Partner',
+    investorType: 'llc', state: 'TN', city: 'Nashville',
+    yearsInvesting: 11, healthcare: true, typicalInvestment: 200_000,
+    assetTypes: ['behavioral_health', 'snf'], states: ['TN', 'OK', 'GA', 'KY'],
+    positions: ['common_equity'], riskTolerance: 'opportunistic',
+    targetReturnMin: 17, minHoldMonths: 36, maxHoldMonths: 72, maxLeveragePct: 0.8,
+  },
+  {
+    slug: 'petronella', company: 'Petronella Family Trust', displayName: 'Petronella Family Trust',
+    email: 'office@petronella.demo', name: 'Bianca Petronella', title: 'Trustee',
+    investorType: 'trust', state: 'MI', city: 'Ann Arbor',
+    yearsInvesting: 26, healthcare: false, typicalInvestment: 250_000,
+    assetTypes: ['memory_care', 'alf'], states: ['MI', 'WI', 'KS'],
+    positions: ['preferred_equity'], riskTolerance: 'conservative',
+    targetReturnMin: 10, minHoldMonths: 60, maxHoldMonths: 120, maxLeveragePct: 0.65,
+  },
+  {
+    slug: 'ivorygate', company: 'Ivorygate Partners', displayName: 'Ivorygate Partners',
+    email: 'deals@ivorygate.demo', name: 'Samuel Adeyemi', title: 'Principal',
+    investorType: 'llc', state: 'OK', city: 'Oklahoma City',
+    yearsInvesting: 7, healthcare: true, typicalInvestment: 175_000,
+    assetTypes: ['snf', 'behavioral_health'], states: [],
+    positions: ['common_equity'], riskTolerance: 'opportunistic',
+    // Accreditation still pending, so the eligibility gate has someone to stop.
+    accreditationPending: true,
+    targetReturnMin: 16, minHoldMonths: 24, maxHoldMonths: 60, maxLeveragePct: 0.82,
+  },
 ]
 
 interface OfferingFixture {
-  dealReference: string
+  /** The facility this raise is against, by fixture name. */
+  dealName: string
   name: string
   offeringType: Offering['offering_type']
   capitalPosition: OfferingTerms['capital_position']
@@ -177,7 +217,7 @@ interface OfferingFixture {
 
 const OFFERINGS: OfferingFixture[] = [
   {
-    dealReference: 'CCX-1001',
+    dealName: 'Lakeview Skilled Nursing Center',
     name: 'Lakeview Skilled Nursing Equity',
     offeringType: 'reg_d_506b',
     capitalPosition: 'common_equity',
@@ -202,7 +242,7 @@ const OFFERINGS: OfferingFixture[] = [
     ],
   },
   {
-    dealReference: 'CCX-1007',
+    dealName: 'Northgate Transitional Care',
     name: 'Northgate Transitional Care Preferred',
     offeringType: 'reg_d_506c',
     capitalPosition: 'preferred_equity',
@@ -223,7 +263,7 @@ const OFFERINGS: OfferingFixture[] = [
     distributions: [{ period: 'Q2 2027', amount: 44_000 }],
   },
   {
-    dealReference: 'CCX-1003',
+    dealName: 'Cedar Ridge Care Center',
     name: 'Cedar Ridge Care Center Equity',
     offeringType: 'reg_d_506b',
     capitalPosition: 'common_equity',
@@ -242,7 +282,7 @@ const OFFERINGS: OfferingFixture[] = [
     interests: ['bellweather', 'ashcroft'],
   },
   {
-    dealReference: 'CCX-1002',
+    dealName: 'Prairie Meadows Health & Rehabilitation',
     name: 'Prairie Meadows Recapitalisation',
     offeringType: 'reg_d_506b',
     capitalPosition: 'preferred_equity',
@@ -258,13 +298,13 @@ const OFFERINGS: OfferingFixture[] = [
     interests: ['harborline', 'marlowe', 'northstar'],
   },
   {
-    dealReference: 'CCX-1005',
-    name: 'Summit Ridge Behavioral Equity',
+    dealName: 'Harborview Post-Acute',
+    name: 'Harborview Post-Acute Equity',
     offeringType: 'reg_d_506c',
     capitalPosition: 'common_equity',
-    issuer: 'Copperline Summit Ridge LLC',
+    issuer: 'Bluestem Harborview Holdings LLC',
     structure: 'Delaware LLC, manager-managed',
-    summary: 'Common equity in the acquisition of a behavioral health campus with an established referral base.',
+    summary: 'Common equity in a value-add acquisition of a 148-bed post-acute facility in Green Bay, Wisconsin, with a $1.8M capital programme and a management change at closing.',
     targetRaise: 2_750_000, minimum: 75_000, maximum: null,
     holdYears: 6, preferredReturnPct: 0.08, targetIrrPct: 18, targetMultiple: 2.1,
     promotePct: 0.25, exitCapRatePct: null, exitMultiple: 7,
@@ -274,13 +314,13 @@ const OFFERINGS: OfferingFixture[] = [
     interests: ['bellweather', 'michael-demo', 'quarrystone'],
   },
   {
-    dealReference: 'CCX-1004',
-    name: 'Grandview Manor Equity',
+    dealName: 'Stonebridge Nursing & Rehabilitation',
+    name: 'Stonebridge Nursing & Rehabilitation Equity',
     offeringType: 'reg_d_506b',
     capitalPosition: 'common_equity',
-    issuer: 'Copperline Grandview Holdings LLC',
+    issuer: 'Bluestem Stonebridge Holdings LLC',
     structure: 'Delaware LLC, manager-managed',
-    summary: 'Common equity in the acquisition of a 138-bed facility with a repositioning plan for the memory care wing.',
+    summary: 'Common equity in the acquisition of a skilled nursing and rehabilitation facility, with a repositioning plan for the sub-acute wing.',
     targetRaise: 4_200_000, minimum: 100_000, maximum: null,
     holdYears: 5, preferredReturnPct: 0.08, targetIrrPct: 17, targetMultiple: 2,
     promotePct: 0.2, exitCapRatePct: 9, exitMultiple: null,
@@ -291,13 +331,13 @@ const OFFERINGS: OfferingFixture[] = [
     interests: [],
   },
   {
-    dealReference: 'CCX-1006',
-    name: 'Riverbend Health Campus Equity',
+    dealName: 'Rivermont Skilled Nursing',
+    name: 'Rivermont Skilled Nursing Equity',
     offeringType: 'reg_d_506b',
     capitalPosition: 'common_equity',
-    issuer: 'Auburn Riverbend Holdings LLC',
+    issuer: 'Auburn Rivermont Holdings LLC',
     structure: 'Delaware LLC, manager-managed',
-    summary: 'Common equity in a bridge acquisition of a health campus, with a refinancing planned in month eighteen.',
+    summary: 'Common equity in a bridge acquisition, with a refinancing planned in month eighteen. A short hold by design.',
     targetRaise: 900_000, minimum: 50_000, maximum: 250_000,
     holdYears: 3, preferredReturnPct: 0.08, targetIrrPct: 19, targetMultiple: 1.7,
     promotePct: 0.2, exitCapRatePct: null, exitMultiple: 6,
@@ -312,13 +352,13 @@ const OFFERINGS: OfferingFixture[] = [
     interests: ['linden'],
   },
   {
-    dealReference: 'CCX-1008',
-    name: 'Whitfield Commons Equity',
+    dealName: 'Willow Creek Care Community',
+    name: 'Willow Creek Care Community Equity',
     offeringType: 'reg_d_506b',
     capitalPosition: 'common_equity',
-    issuer: 'Meridian Whitfield Commons LLC',
+    issuer: 'Auburn Willow Creek Holdings LLC',
     structure: 'Delaware LLC, manager-managed',
-    summary: 'Common equity in the acquisition of a 92-bed facility with a stabilising census.',
+    summary: 'Common equity in the acquisition of a facility with a stabilising census. The raise has only just opened.',
     targetRaise: 2_000_000, minimum: 50_000, maximum: null,
     holdYears: 5, preferredReturnPct: 0.08, targetIrrPct: 14, targetMultiple: 1.8,
     promotePct: 0.2, exitCapRatePct: 9.5, exitMultiple: null,
@@ -327,6 +367,123 @@ const OFFERINGS: OfferingFixture[] = [
     status: 'live',
     commitments: [{ investor: 'ashcroft', amount: 60_000, accepted: true }],
     interests: ['michael-demo'],
+  },
+  {
+    dealName: 'Silver Birch Assisted Living',
+    name: 'Silver Birch Assisted Living Equity',
+    offeringType: 'reg_d_506c',
+    capitalPosition: 'common_equity',
+    issuer: 'Meridian Silver Birch Holdings LLC',
+    structure: 'Wisconsin LLC, manager-managed',
+    summary: 'Common equity in the acquisition of an 88-unit private-pay assisted living community in Madison, Wisconsin. Medicaid is under 10% of revenue.',
+    targetRaise: 5_600_000, minimum: 100_000, maximum: 1_500_000,
+    holdYears: 6, preferredReturnPct: 0.07, targetIrrPct: 14.5, targetMultiple: 1.92,
+    promotePct: 0.2, exitCapRatePct: 6.75, exitMultiple: null,
+    revenueGrowthPct: 3.5, expenseGrowthPct: 3.2, sellingCostsPct: 2,
+    status: 'live',
+    commitments: [
+      { investor: 'greenfell', amount: 600_000, accepted: true },
+      { investor: 'wrenfield', amount: 300_000, accepted: true },
+      { investor: 'petronella', amount: 250_000, accepted: false },
+    ],
+    interests: ['harborline', 'michael-demo', 'bellweather'],
+    distributions: [{ period: 'Q1 2027', amount: 98_000 }],
+  },
+  {
+    dealName: 'Cardinal Point Memory Care',
+    name: 'Cardinal Point Memory Care Equity',
+    offeringType: 'reg_d_506b',
+    capitalPosition: 'common_equity',
+    issuer: 'Meridian Cardinal Point LLC',
+    structure: 'Delaware LLC, manager-managed',
+    summary: 'Common equity in the acquisition of a purpose-built 64-bed memory care community in Overland Park, Kansas. The appraisal is marginally below the contract price.',
+    targetRaise: 4_100_000, minimum: 75_000, maximum: null,
+    holdYears: 5, preferredReturnPct: 0.08, targetIrrPct: 16.2, targetMultiple: 1.98,
+    promotePct: 0.2, exitCapRatePct: 7.25, exitMultiple: null,
+    revenueGrowthPct: 4, expenseGrowthPct: 3.6, sellingCostsPct: 2,
+    status: 'live',
+    commitments: [
+      { investor: 'greenfell', amount: 500_000, accepted: true },
+      { investor: 'petronella', amount: 250_000, accepted: true },
+    ],
+    interests: ['bellweather', 'quarrystone', 'michael-demo', 'linden'],
+  },
+  {
+    dealName: 'Harmony House Behavioral Health',
+    name: 'Harmony House Behavioral Equity',
+    offeringType: 'reg_d_506c',
+    capitalPosition: 'common_equity',
+    issuer: 'Auburn Harmony House LLC',
+    structure: 'Tennessee LLC, manager-managed',
+    summary: 'Common equity in a combined acquisition and refinancing of a 72-bed inpatient behavioural health facility in Chattanooga, Tennessee. Managed care is 41% of revenue.',
+    targetRaise: 3_200_000, minimum: 50_000, maximum: 800_000,
+    holdYears: 5, preferredReturnPct: 0.08, targetIrrPct: 18.4, targetMultiple: 2.15,
+    promotePct: 0.25, exitCapRatePct: null, exitMultiple: 7.5,
+    revenueGrowthPct: 4.5, expenseGrowthPct: 4, sellingCostsPct: 2.5,
+    status: 'live',
+    commitments: [
+      { investor: 'holloway', amount: 400_000, accepted: true },
+      { investor: 'cedarpoint', amount: 300_000, accepted: true },
+      { investor: 'ivorygate', amount: 175_000, accepted: false },
+    ],
+    interests: ['michael-demo', 'bellweather'],
+  },
+  {
+    dealName: 'Oakmont Village Senior Living',
+    name: 'Oakmont Village Preferred',
+    offeringType: 'reg_d_506b',
+    capitalPosition: 'preferred_equity',
+    issuer: 'Bluestem Oakmont Preferred LLC',
+    structure: 'Delaware LLC, preferred units',
+    summary: 'Preferred equity with a 9% cumulative return in the refinancing of a stabilised 110-unit senior living community in Boise, Idaho, held by the sponsor since 2014.',
+    targetRaise: 2_400_000, minimum: 100_000, maximum: null,
+    holdYears: 4, preferredReturnPct: 0.09, targetIrrPct: 11.8, targetMultiple: 1.45,
+    promotePct: 0.1, exitCapRatePct: 7, exitMultiple: null,
+    revenueGrowthPct: 3, expenseGrowthPct: 3, sellingCostsPct: 2,
+    status: 'live',
+    commitments: [
+      { investor: 'petronella', amount: 300_000, accepted: true },
+      { investor: 'harborline', amount: 500_000, accepted: true },
+      { investor: 'wrenfield', amount: 400_000, accepted: true },
+    ],
+    interests: ['greenfell', 'quarrystone'],
+    distributions: [
+      { period: 'Q4 2026', amount: 54_000 },
+      { period: 'Q1 2027', amount: 54_000 },
+    ],
+  },
+  {
+    dealName: 'Lantern Ridge Care Center',
+    name: 'Lantern Ridge Turnaround Equity',
+    offeringType: 'reg_d_506c',
+    capitalPosition: 'common_equity',
+    issuer: 'Auburn Lantern Ridge LLC',
+    structure: 'Oklahoma LLC, manager-managed',
+    summary: 'Common equity in the acquisition of a two-star, 118-bed facility in Tulsa, Oklahoma, at a price below appraised value. A $1.4M capital programme and a staffing plan are budgeted from day one.',
+    targetRaise: 3_800_000, minimum: 50_000, maximum: null,
+    holdYears: 7, preferredReturnPct: 0.08, targetIrrPct: 21.5, targetMultiple: 2.4,
+    promotePct: 0.25, exitCapRatePct: null, exitMultiple: 6.5,
+    revenueGrowthPct: 5, expenseGrowthPct: 4.2, sellingCostsPct: 2.5,
+    status: 'live',
+    commitments: [{ investor: 'holloway', amount: 200_000, accepted: true }],
+    interests: ['cedarpoint', 'ivorygate', 'michael-demo'],
+  },
+  {
+    dealName: 'Foxglove Court',
+    name: 'Foxglove Court Equity',
+    offeringType: 'reg_d_506b',
+    capitalPosition: 'common_equity',
+    issuer: 'Meridian Foxglove LLC',
+    structure: 'Michigan LLC, manager-managed',
+    summary: 'Common equity in the acquisition of a 56-bed memory care community in Grand Rapids, Michigan. Small, private-pay, and not exposed to any single payer decision.',
+    targetRaise: 3_400_000, minimum: 50_000, maximum: 900_000,
+    holdYears: 5, preferredReturnPct: 0.07, targetIrrPct: 15.1, targetMultiple: 1.88,
+    promotePct: 0.2, exitCapRatePct: 7.5, exitMultiple: null,
+    revenueGrowthPct: 3.8, expenseGrowthPct: 3.5, sellingCostsPct: 2,
+    // A draft: the sponsor has not submitted it, so no investor can see it.
+    status: 'draft',
+    commitments: [],
+    interests: [],
   },
 ]
 
@@ -337,6 +494,8 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
   // The acknowledging user, kept alongside the profile: an acknowledgement is
   // evidence that a person accepted specific words, so it references a person.
   const investorUsers = new Map<string, string>()
+  /** The person's own name, which is what they would type as a signature. */
+  const investorNames = new Map<string, string>()
 
   // --- investors -----------------------------------------------------------
   for (const fixture of INVESTORS) {
@@ -373,6 +532,7 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
     } as Omit<InvestorProfile, 'id' | 'created_at' | 'updated_at'>)
     profiles.set(fixture.slug, profile)
     investorUsers.set(fixture.slug, user.id)
+    investorNames.set(fixture.slug, fixture.name)
 
     await store.insert('investor_preferences', {
       investor_id: profile.id,
@@ -407,11 +567,15 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
 
   // --- offerings ------------------------------------------------------------
   const deals = await store.select('deals')
-  const dealByReference = new Map<string, Deal>(deals.map((deal) => [deal.reference, deal]))
+  // Keyed on the facility's name, not its CCX reference. References are handed
+  // out by position as the deal fixtures are inserted, so adding a property in
+  // the middle silently re-pointed every offering after it — which is how six
+  // of the eight raises came to describe facilities they were not attached to.
+  const dealByName = new Map<string, Deal>(deals.map((deal) => [deal.name, deal]))
   let reference = 1001
 
   for (const fixture of OFFERINGS) {
-    const deal = dealByReference.get(fixture.dealReference)
+    const deal = dealByName.get(fixture.dealName)
     if (!deal) continue
 
     const creator = await store.selectOne('company_members', { where: { company_id: deal.company_id } })
@@ -570,6 +734,24 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
         expressed_at: now,
         withdrawn_at: null,
       } as Omit<InvestmentInterest, 'id' | 'created_at' | 'updated_at'>)
+
+      // Nobody reaches an offering's detail without signing, so an investor
+      // seeded as already interested has necessarily already signed. Without
+      // this the demo would show a data room every investor is locked out of.
+      const signingUser = investorUsers.get(slug)
+      if (signingUser) {
+        await store.insert('nda_acceptances', {
+          offering_id: offering.id,
+          company_id: profile.company_id,
+          user_id: signingUser,
+          investor_id: profile.id,
+          nda_version: CURRENT_NDA.version,
+          signed_name: investorNames.get(slug) ?? profile.display_name,
+          accepted_at: now,
+          ip_address: null,
+          user_agent: null,
+        } as never)
+      }
     }
 
     const positions = new Map<string, InvestmentPosition>()

@@ -3,7 +3,8 @@ import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
 import { subjectOf } from '@/lib/access'
 import { canViewOffering } from '@/lib/policy'
-import { assetNoun, stateName } from '@/lib/deal/display'
+import { assetNoun } from '@/lib/deal/display'
+import { offeringLocation, offeringTitle } from '@/lib/equity/display'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { formatCurrency, formatPercent, formatRatio } from '@/lib/utils/format'
 import {
@@ -11,6 +12,7 @@ import {
 } from '@/components/ui/primitives'
 import { CapitalStackChart } from '@/components/equity/capital-stack-chart'
 import { InvestorActions } from './actions-panel'
+import { NdaGate } from './nda-gate'
 import { AskPanel } from './ask-panel'
 import { BearCase } from './bear-case'
 import { Disclose } from './disclose'
@@ -19,6 +21,8 @@ import { activeStack } from '@/services/equity/capital-stack'
 import { dataRoomFor, lockedCounts } from '@/services/equity/data-room'
 import { evaluateEligibility } from '@/services/equity/commitments'
 import { questionsFor } from '@/services/equity/portfolio'
+import { ndaState } from '@/services/equity/nda'
+import { CURRENT_NDA } from '@/lib/equity/nda'
 import type { EligibilityResult } from '@/lib/equity/eligibility'
 
 export const dynamic = 'force-dynamic'
@@ -52,21 +56,31 @@ export default async function OfferingPage({
   if (!offering) notFound()
   if (!canViewOffering(subjectOf(actor), offering)) notFound()
 
-  const [terms, snapshot, analysis, stack, documents, locked, questions] = await Promise.all([
+  // Everything below the teaser comes out of the operator's own record, so
+  // nothing below the teaser is loaded until the agreement is signed. Gating
+  // the render alone would still have fetched it.
+  const nda = await ndaState(actor, offeringId)
+
+  const [terms, snapshot] = await Promise.all([
     store.selectOne('offering_terms', { where: { offering_id: offeringId } }),
     buildSnapshot(offering.deal_id),
-    analyzeOffering(offeringId),
-    activeStack(offering.deal_id),
-    dataRoomFor(actor, offeringId),
-    lockedCounts(actor, offeringId),
-    questionsFor(actor, offeringId),
   ])
   if (!snapshot) notFound()
+
+  const [analysis, stack, documents, locked, questions] = nda.accepted
+    ? await Promise.all([
+      analyzeOffering(offeringId),
+      activeStack(offering.deal_id),
+      dataRoomFor(actor, offeringId),
+      lockedCounts(actor, offeringId),
+      questionsFor(actor, offeringId),
+    ])
+    : [null, null, [], [], []]
 
   let eligibility: EligibilityResult | null = null
   let hasInterest = false
   let committed: number | null = null
-  if (actor.investor) {
+  if (actor.investor && nda.accepted) {
     const investorId = actor.investor.id
     const [result, interest, commitments] = await Promise.all([
       evaluateEligibility(actor, offeringId).catch(() => null),
@@ -83,6 +97,7 @@ export default async function OfferingPage({
 
   const { deal, facility, sponsor, summary, latest, prior } = snapshot
   const beds = facility?.operating_beds ?? facility?.licensed_beds ?? null
+  const revealIdentity = nda.accepted || deal.company_id === actor.company.id || actor.isAdmin
   const projection = analysis?.projection ?? null
   const risk = analysis?.risk ?? null
   const raised = offering.target_raise && offering.target_raise > 0
@@ -95,10 +110,12 @@ export default async function OfferingPage({
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-[22px] font-semibold text-ink">{offering.name}</h1>
+            <h1 className="text-[22px] font-semibold text-ink">
+              {offeringTitle(offering, deal, facility, revealIdentity)}
+            </h1>
             <p className="mt-1 text-[13px] text-ink-secondary">
               {[
-                facility?.state ? stateName(facility.state) : null,
+                offeringLocation(deal, facility, revealIdentity),
                 assetNoun(deal.asset_type),
                 beds ? `${beds} beds` : null,
                 terms?.capital_position === 'preferred_equity' ? 'Preferred equity' : 'Common equity',
@@ -143,6 +160,9 @@ export default async function OfferingPage({
         Exchange is not your broker or adviser and does not recommend this or any investment.
       </Alert>
 
+      {!nda.accepted ? (
+        <NdaGate offeringId={offeringId} nda={CURRENT_NDA} />
+      ) : (
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
           {/* ---- what it is ------------------------------------------------ */}
@@ -387,7 +407,7 @@ export default async function OfferingPage({
           {/* ---- questions ---------------------------------------------------- */}
           <AskPanel
             offeringId={offeringId}
-            offeringName={offering.name}
+            offeringName={offeringTitle(offering, deal, facility, revealIdentity)}
             suggestions={
               analysis && analysis.analysis.questions_to_ask.length > 0
                 ? analysis.analysis.questions_to_ask.slice(0, 5)
@@ -411,6 +431,7 @@ export default async function OfferingPage({
           />
         </div>
       </div>
+      )}
     </div>
   )
 }

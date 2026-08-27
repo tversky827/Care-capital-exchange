@@ -119,7 +119,7 @@ async function main(): Promise<void> {
     // The lender-facing page is part of the debt marketplace, which this
     // deployment does not run.
     { path: '/for-lenders', allow: [404] },
-    { path: '/pricing', expect: 'Transaction fees', absent: 'Lender subscription' },
+    { path: '/pricing', expect: 'We are paid when you are', absent: 'per month' },
     { path: '/about', expect: 'Principles' },
     { path: '/contact', expect: 'Contact' },
     { path: '/login', expect: 'Sign in' },
@@ -198,8 +198,29 @@ async function main(): Promise<void> {
   // The equity marketplace has its own role, its own routes and its own
   // navigation, so it needs its own pass. A dead link in this half is exactly
   // what an earlier build shipped.
-  const investorUser = await store.selectOne('users', { where: { role: 'investor' } })
-  const liveOffering = await store.selectOne('offerings', { where: { status: 'live' } })
+  // The investor and offering are chosen as a pair the seed has already put a
+  // signature between, so the signed and unsigned cases can both be asserted
+  // rather than depending on which rows happen to come back first.
+  const signature = (await store.select('nda_acceptances', {}))[0]
+  const signedOffering = signature ? await store.findById('offerings', signature.offering_id) : null
+  const signerMember = signature
+    ? await store.selectOne('company_members', { where: { company_id: signature.company_id } })
+    : null
+  const investorUser = signerMember
+    ? await store.findById('users', signerMember.user_id)
+    : await store.selectOne('users', { where: { role: 'investor' } })
+  const liveOffering = signedOffering?.status === 'live'
+    ? signedOffering
+    : await store.selectOne('offerings', { where: { status: 'live' } })
+
+  // An offering the same organisation has not signed for, to prove the gate holds.
+  const signedIds = new Set(
+    (await store.select('nda_acceptances', { where: { company_id: signature?.company_id ?? '' } }))
+      .map((row) => row.offering_id),
+  )
+  const unsigned = (await store.select('offerings', { where: { status: 'live' } }))
+    .find((offering) => !signedIds.has(offering.id))
+
   if (investorUser) {
     console.log('Investor routes')
     const investor = await cookieFor(investorUser.email)
@@ -213,9 +234,19 @@ async function main(): Promise<void> {
       { path: '/notifications', expect: 'Notifications' },
       ...(liveOffering
         ? [
+          // Seeded investors have already signed for the offerings they engaged
+          // with; this one asserts the detail is reachable once they have.
           { path: `/investments/${liveOffering.id}`, expect: 'What it could pay' },
           { path: `/investments/compare?ids=${liveOffering.id}`, expect: 'Choose offerings to compare' },
         ]
+        : []),
+      // The confidentiality gate: the teaser renders, the detail does not.
+      ...(unsigned
+        ? [{
+          path: `/investments/${unsigned.id}`,
+          expect: 'Confidentiality agreement',
+          absent: 'What it could pay',
+        }]
         : []),
     ])
   }

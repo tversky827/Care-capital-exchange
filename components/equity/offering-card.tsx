@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Badge, Card } from '@/components/ui/primitives'
 import { assetNoun, stateName } from '@/lib/deal/display'
+import { offeringTitle } from '@/lib/equity/display'
 import { formatCurrency, formatPercent } from '@/lib/utils/format'
 import type { Deal, Facility } from '@/types'
 import type { InvestorMatch, Offering, OfferingTerms } from '@/types/equity'
@@ -19,7 +20,7 @@ import type { InvestorMatch, Offering, OfferingTerms } from '@/types/equity'
  * shared.
  */
 export function OfferingCard({
-  offering, terms, deal, facility, match, committedPct,
+  offering, terms, deal, facility, match, committedPct, revealIdentity = false,
 }: {
   offering: Offering
   terms: OfferingTerms | null
@@ -27,6 +28,8 @@ export function OfferingCard({
   facility: Facility | null
   match?: InvestorMatch | null
   committedPct?: number | null
+  /** Whether this viewer has earned the facility's name. */
+  revealIdentity?: boolean
 }) {
   const beds = facility?.operating_beds ?? facility?.licensed_beds ?? null
   const location = facility?.state ? stateName(facility.state) : null
@@ -41,7 +44,7 @@ export function OfferingCard({
         <div className="flex items-start justify-between gap-3 p-4 pb-3">
           <div className="min-w-0">
             <h3 className="truncate text-[15px] font-semibold text-ink group-hover:text-accent">
-              {offering.name}
+              {offeringTitle(offering, deal, facility, revealIdentity)}
             </h3>
             <p className="mt-0.5 text-[12px] text-ink-muted">
               {[beds ? `${beds}-bed` : null, assetNoun(deal.asset_type), location].filter(Boolean).join(' · ')}

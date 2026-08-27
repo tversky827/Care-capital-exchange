@@ -2,17 +2,19 @@
 
 import Link from 'next/link'
 import { useActionState, useState } from 'react'
-import { KeyRound, Mail } from 'lucide-react'
+import { ArrowRight, KeyRound, Mail } from 'lucide-react'
 import { Alert, Badge, Button, Card, Field, Input, Separator } from '@/components/ui/primitives'
 import { demoLoginAction, loginAction, magicLinkAction, type AuthState } from '../actions'
-import { titleize } from '@/lib/utils/format'
 
 interface DemoAccount {
   email: string
   name: string
-  role: string
   company: string
   companyType: string
+  /** What to call this side of the marketplace on the button. */
+  label: string
+  /** What a visitor will find after signing in as them. */
+  blurb: string
 }
 
 export function LoginForm({
@@ -28,7 +30,7 @@ export function LoginForm({
       <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_1fr]">
         <Card className="p-6">
           <h1 className="text-[18px] font-semibold text-ink">Sign in</h1>
-          <p className="mt-1 text-[12px] text-ink-muted">Access your deals, pipeline and data room.</p>
+          <p className="mt-1 text-[12px] text-ink-muted">Your raises, your portfolio and your documents.</p>
 
           <div className="mt-5 flex gap-1 border-b border-line">
             <TabButton active={mode === 'password'} onClick={() => setMode('password')} icon={<KeyRound className="size-3.5" />}>
@@ -94,8 +96,9 @@ export function LoginForm({
               <Badge tone="warning">Demo data</Badge>
             </div>
             <p className="mt-1.5 text-[12px] leading-relaxed text-ink-muted">
-              This environment is seeded with fictional companies, deals and lenders. Sign in as any
-              of them to see the product from that side of the marketplace.
+              Everything here is fictional and nothing can move money. One click signs you in — no
+              password, no sign-up — and each account starts you somewhere different in the same
+              marketplace.
             </p>
 
             <div className="mt-4 space-y-2">
@@ -108,14 +111,18 @@ export function LoginForm({
                     className="flex w-full items-center justify-between gap-4 border border-line px-3 py-2.5 text-left transition-colors hover:border-accent-line hover:bg-accent-soft/40 disabled:opacity-60"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-medium text-ink">{account.company}</span>
-                      <span className="block truncate text-[11px] text-ink-muted">
-                        {account.name} · {account.email}
+                      <span className="flex items-center gap-2">
+                        <span className="text-[13px] font-medium text-ink">Sign in as {account.label.toLowerCase()}</span>
+                        <Badge tone={account.companyType === 'investor' ? 'positive' : account.companyType === 'admin' ? 'neutral' : 'accent'}>
+                          {account.label}
+                        </Badge>
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-relaxed text-ink-muted">{account.blurb}</span>
+                      <span className="mt-1 block truncate text-[11px] text-ink-muted">
+                        {account.name} · {account.company}
                       </span>
                     </span>
-                    <Badge tone={account.companyType === 'lender' ? 'accent' : account.companyType === 'admin' ? 'neutral' : 'positive'}>
-                      {titleize(account.companyType)}
-                    </Badge>
+                    <ArrowRight className="size-4 shrink-0 text-ink-muted" />
                   </button>
                 </form>
               ))}
@@ -124,7 +131,8 @@ export function LoginForm({
             {demoState.error ? <Alert tone="critical" className="mt-3">{demoState.error}</Alert> : null}
 
             <p className="mt-4 text-[11px] leading-relaxed text-ink-muted">
-              Password for every demonstration account is <code className="rounded-[2px] bg-surface-sunken px-1 py-0.5 font-mono">DemoPass123!</code>
+              Every demonstration account also signs in normally, with the password{' '}
+              <code className="rounded-[2px] bg-surface-sunken px-1 py-0.5 font-mono">DemoPass123!</code>
             </p>
           </Card>
         ) : null}

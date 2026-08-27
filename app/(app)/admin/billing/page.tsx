@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { db } from '@/db'
 import { requireAdmin } from '@/lib/auth/session'
-import { FEE_SCHEDULE, PLAN_CATALOG } from '@/services/billing'
+import { FEE_SCHEDULE } from '@/services/billing'
 import { Alert, Badge, Card, PageHeader, Section, Table, Td, Th, Tr } from '@/components/ui/primitives'
 import { MetricTile } from '@/components/deal/common'
 import { formatCurrency, formatDate, titleize } from '@/lib/utils/format'
@@ -12,17 +12,12 @@ export default async function AdminBillingPage() {
   await requireAdmin()
   const store = await db()
 
-  const [subscriptions, events, companies] = await Promise.all([
-    store.select('subscriptions', {}),
+  const [events, companies] = await Promise.all([
     store.select('billing_events', { orderBy: { field: 'created_at', dir: 'desc' }, limit: 200 }),
     store.select('companies', {}),
   ])
   const companyName = new Map(companies.map((company) => [company.id, company.name]))
 
-  const recurring = subscriptions.reduce((sum, subscription) => {
-    const plan = PLAN_CATALOG.find((entry) => entry.key === subscription.plan_key)
-    return sum + (plan?.monthlyUsd ?? 0)
-  }, 0)
   const feeRevenue = events
     .filter((event) => event.kind === 'success_fee' || event.kind === 'transaction_fee')
     .reduce((sum, event) => sum + event.amount_usd, 0)
@@ -36,41 +31,19 @@ export default async function AdminBillingPage() {
       />
 
       <Alert tone="neutral" title="No payment provider configured">
-        Subscriptions and fees are recorded locally rather than charged. The provider interface is
-        Stripe-shaped, so connecting one does not change any other part of the product.
+        Fees are recorded locally rather than charged. The provider interface is Stripe-shaped, so
+        connecting one does not change any other part of the product.
       </Alert>
 
       <Card>
         <div className="data-grid grid-cols-2 md:grid-cols-4">
-          <MetricTile label="Active subscriptions" value={subscriptions.filter((entry) => entry.status === 'active').length} />
-          <MetricTile label="Monthly recurring" value={formatCurrency(recurring)} />
-          <MetricTile label="Transaction and success fees" value={formatCurrency(feeRevenue, { decimals: 2 })} />
+          <MetricTile label="Fees earned" value={formatCurrency(feeRevenue, { decimals: 2 })} />
           <MetricTile label="Billing events" value={events.length} />
+          <MetricTile label="Recurring revenue" value="None" detail="the platform charges on outcomes only" />
         </div>
       </Card>
 
-      <Section title="Subscriptions">
-        <Table>
-          <thead><tr><Th>Organisation</Th><Th>Plan</Th><Th>Status</Th><Th numeric>Seats</Th><Th numeric>Monthly</Th><Th>Renews</Th></tr></thead>
-          <tbody>
-            {subscriptions.map((subscription) => {
-              const plan = PLAN_CATALOG.find((entry) => entry.key === subscription.plan_key)
-              return (
-                <Tr key={subscription.id}>
-                  <Td className="font-medium text-ink">{companyName.get(subscription.company_id) ?? 'Unknown'}</Td>
-                  <Td className="text-ink-secondary">{plan?.name ?? subscription.plan_key}</Td>
-                  <Td><Badge tone={subscription.status === 'active' ? 'positive' : 'warning'}>{titleize(subscription.status)}</Badge></Td>
-                  <Td numeric>{subscription.seats}</Td>
-                  <Td numeric>{plan?.monthlyUsd !== null && plan?.monthlyUsd !== undefined ? formatCurrency(plan.monthlyUsd) : 'Custom'}</Td>
-                  <Td className="whitespace-nowrap text-ink-muted">{formatDate(subscription.current_period_end)}</Td>
-                </Tr>
-              )
-            })}
-          </tbody>
-        </Table>
-      </Section>
-
-      <Section title="Fee schedule" description="Charged only on capital that actually funds through the platform.">
+      <Section title="Fee schedule" description="Charged only on capital that actually funds. Nothing is charged on a raise that does not close, and an investor is never charged.">
         <Table>
           <thead><tr><Th>Rule</Th><Th>Applies to</Th><Th numeric>Rate</Th><Th numeric>Cap</Th></tr></thead>
           <tbody>

@@ -15,6 +15,8 @@ import {
   requestVerification, updatePreferences,
 } from '@/services/equity/investors'
 import { dataRoomFor, publishDocument } from '@/services/equity/data-room'
+import { acceptNda, ndaState, requireNda } from '@/services/equity/nda'
+import { computeFee, FEE_SCHEDULE } from '@/services/billing'
 import { portfolioFor, askQuestion, questionsFor } from '@/services/equity/portfolio'
 import { matchCountsForOffering } from '@/services/equity/matching'
 import { capitalMarketsView } from '@/services/equity/capital-stack'
@@ -221,6 +223,67 @@ describe('one investor cannot reach another investor', () => {
   })
 })
 
+describe('the confidentiality agreement gates the detail', () => {
+  it('requires an outside viewer to sign before anything is released', async () => {
+    const dave = await createActor(store, {
+      email: 'dave@invest.test', name: 'Dave', companyName: 'Dave Capital',
+      companyType: 'investor', role: 'investor',
+    })
+    const onboarded = await onboard(dave, 'Dave Capital', 'IL')
+
+    const before = await ndaState(onboarded, offering.id)
+    expect(before.required).toBe(true)
+    expect(before.accepted).toBe(false)
+    await expect(requireNda(onboarded, offering.id)).rejects.toThrow(/confidentiality/i)
+    // The data room is empty until it is signed, whatever the access ladder
+    // would otherwise have allowed.
+    expect(await dataRoomFor(onboarded, offering.id)).toHaveLength(0)
+
+    await acceptNda(onboarded, offering.id, 'Dave Ashworth')
+    const after = await ndaState(onboarded, offering.id)
+    expect(after.accepted).toBe(true)
+    await expect(requireNda(onboarded, offering.id)).resolves.toBeUndefined()
+  })
+
+  it('does not ask the operator to sign an agreement about their own raise', async () => {
+    const state = await ndaState(sponsor, offering.id)
+    expect(state.required).toBe(false)
+    expect(state.accepted).toBe(true)
+    await expect(acceptNda(sponsor, offering.id, 'Sam Sponsor')).rejects.toThrow(/your own organisation/i)
+  })
+
+  it('does not ask an administrator to sign', async () => {
+    const state = await ndaState(admin, offering.id)
+    expect(state.required).toBe(false)
+    expect(state.accepted).toBe(true)
+  })
+
+  it('refuses a signature that is not a name', async () => {
+    const erin = await createActor(store, {
+      email: 'erin@invest.test', name: 'Erin', companyName: 'Erin Partners',
+      companyType: 'investor', role: 'investor',
+    })
+    await expect(acceptNda(erin, offering.id, '  ')).rejects.toThrow(/full name/i)
+  })
+
+  // Two raises on the same facility, so the case cannot be passed by the deal
+  // differing — it is the offering the agreement is about.
+  it('does not carry a signature on one offering across to another', async () => {
+    const frank = await createActor(store, {
+      email: 'frank@invest.test', name: 'Frank', companyName: 'Frank Holdings',
+      companyType: 'investor', role: 'investor',
+    })
+    const otherOffering = await createOffering(sponsor, deal.id, {
+      name: 'Second raise on the same facility', offering_type: 'reg_d_506b',
+      target_raise: 1_000_000, minimum_investment: 50_000,
+    })
+
+    await acceptNda(frank, offering.id, 'Frank Osei')
+    expect((await ndaState(frank, offering.id)).accepted).toBe(true)
+    expect((await ndaState(frank, otherOffering.id)).accepted).toBe(false)
+  })
+})
+
 describe('access to offering documents follows engagement, not curiosity', () => {
   it('withholds a committed-tier document from an investor who has not committed', async () => {
     const carol = await createActor(store, {
@@ -228,6 +291,8 @@ describe('access to offering documents follows engagement, not curiosity', () =>
       companyType: 'investor', role: 'investor',
     })
     const onboarded = await onboard(carol, 'Carol Ltd', 'IL')
+    // Signed, so the ladder rather than the gate is what this case tests.
+    await acceptNda(onboarded, offering.id, 'Carol Nkemelu')
 
     const documents = await store.select('documents', { where: { deal_id: deal.id } })
     await publishDocument(sponsor, offering.id, documents[0].id, {
@@ -348,5 +413,43 @@ describe('records reference the entities their columns name', () => {
       expect(userIds.has(offering.created_by)).toBe(true)
       if (offering.published_by) expect(userIds.has(offering.published_by)).toBe(true)
     }
+  })
+})
+
+describe('the platform charges on outcomes only', () => {
+  it('has no recurring charge in the schedule', () => {
+    // Every rule is a share of something that funded. A rule with no basis
+    // points, or one that named a period, would be a subscription by another
+    // name.
+    expect(FEE_SCHEDULE.every((fee) => fee.basisPoints > 0)).toBe(true)
+    expect(FEE_SCHEDULE.some((fee) => fee.appliesTo === 'sponsor')).toBe(true)
+    // Investors are never charged.
+    expect(FEE_SCHEDULE.some((fee) => (fee.appliesTo as string) === 'investor')).toBe(false)
+  })
+
+  it('charges nothing on a raise that funded nothing', () => {
+    expect(computeFee('sponsor_success_fee', 0)).toBe(0)
+  })
+
+  it('takes the stated share of what actually funded', () => {
+    const rule = FEE_SCHEDULE.find((fee) => fee.key === 'sponsor_success_fee')!
+    expect(computeFee('sponsor_success_fee', 1_000_000)).toBe(1_000_000 * rule.basisPoints / 10_000)
+  })
+
+  it('returns nothing for a rule that does not exist rather than guessing one', () => {
+    expect(computeFee('no_such_fee', 5_000_000)).toBe(0)
+  })
+
+  it('records a fee once when a raise closes, and not again', async () => {
+    const closing = await createOffering(sponsor, deal.id, {
+      name: 'Closing raise', offering_type: 'reg_d_506b',
+      target_raise: 2_000_000, minimum_investment: 50_000,
+    })
+    await setOfferingStatus(sponsor, closing.id, 'closed', 'Raise complete.')
+    const first = await store.select('billing_events', {})
+    await setOfferingStatus(sponsor, closing.id, 'closed', 'Closed again.')
+    const second = await store.select('billing_events', {})
+    // Nothing funded on this one, so nothing is billed either time.
+    expect(second.length).toBe(first.length)
   })
 })

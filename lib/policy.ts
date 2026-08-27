@@ -36,6 +36,23 @@ export interface PolicySubject {
 export interface DealAccessContext {
   /** The distribution row linking this lender's organisation to the deal, if any. */
   distribution?: DealDistribution | null
+  /**
+   * True when an offering on this deal has released this document to the
+   * viewer's organisation: it is published at or below the access level their
+   * engagement has earned, and they have signed the offering's confidentiality
+   * agreement.
+   *
+   * Resolved by the caller rather than here, because it depends on rows this
+   * module deliberately cannot read. It arrives already decided, the same way
+   * the distribution row does.
+   */
+  offeringRelease?: boolean
+  /**
+   * True when the viewer's organisation has signed the confidentiality
+   * agreement on an offering against this deal. Resolved by the caller, like
+   * the distribution row.
+   */
+  ndaSigned?: boolean
 }
 
 const LIVE_DISTRIBUTION_STATUSES: DealDistribution['status'][] = ['sent', 'viewed', 'engaged', 'passed']
@@ -76,8 +93,12 @@ export function canViewDealIdentity(subject: PolicySubject, deal: Deal, ctx: Dea
   if (subject.isAdmin) return true
   if (ownsDeal(subject, deal)) return true
   if (!deal.anonymize_in_marketplace && canViewDeal(subject, deal, ctx)) return true
-  // Anonymized deals reveal identity only to lenders the borrower distributed to.
-  return subject.companyType === 'lender' && hasLiveDistribution(subject, deal, ctx)
+  // An anonymized deal names itself only to someone who has taken on an
+  // obligation about it: a lender the operator distributed to, or a viewer who
+  // has signed the confidentiality agreement on its raise.
+  if (subject.companyType === 'lender') return hasLiveDistribution(subject, deal, ctx)
+  if (subject.companyType === 'investor') return ctx.ndaSigned === true
+  return false
 }
 
 export function canEditDeal(subject: PolicySubject, deal: Deal): boolean {
@@ -126,11 +147,14 @@ export function canViewDocument(
   if (document.deleted_at) return subject.isAdmin
   if (subject.isAdmin) return true
   if (document.company_id === subject.companyId) return true
-  if (subject.companyType !== 'lender') return false
-  // Restricted documents never leave the borrower's organisation, regardless
-  // of distribution — this is the switch a borrower uses for anything they are
-  // not willing to put in front of a lender.
+  // Restricted documents never leave the operator's organisation, whatever
+  // route a viewer arrived by. This is checked before the offering release so
+  // publishing to a data room cannot override it.
   if (document.visibility === 'restricted') return false
+  // An investor reaches a document through an offering's data room, never
+  // through deal distribution.
+  if (subject.companyType === 'investor') return ctx.offeringRelease === true
+  if (subject.companyType !== 'lender') return false
   if (grantIsLive(ctx) && ctx.grant!.can_view) return true
   if (document.visibility !== 'distributed_lenders') return false
   // Marketplace discovery alone is never enough to reach a document.

@@ -4,6 +4,7 @@ import { subjectOf } from '@/lib/access'
 import { authorize, canViewOfferingDocument, investorAccessLevel } from '@/lib/policy'
 import { recordAudit } from '../audit'
 import { requireOffering } from './offerings'
+import { ndaApplies, ndaFor } from './nda'
 import type { Actor } from '@/lib/auth/session'
 import type { DocumentRecord } from '@/types'
 import type {
@@ -117,6 +118,12 @@ export async function stageFor(actor: Actor, offeringId: string): Promise<Invest
 export async function dataRoomFor(actor: Actor, offeringId: string): Promise<DataRoomEntry[]> {
   const store = await db()
   const offering = await requireOffering(offeringId)
+
+  // The access ladder decides which documents an engagement has earned. The
+  // NDA decides whether any of them may be shown at all, and it is checked
+  // here rather than only in the page so a direct call cannot step around it.
+  if (ndaApplies(actor, offering.company_id) && !(await ndaFor(actor, offeringId))) return []
+
   const [entries, stage] = await Promise.all([
     store.select('offering_documents', {
       where: { offering_id: offeringId }, orderBy: { field: 'sort_order' },

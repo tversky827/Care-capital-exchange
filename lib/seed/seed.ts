@@ -124,14 +124,6 @@ async function seed(store: Store): Promise<void> {
       await link(company.id, user.id, member.role)
       if (member.role === 'owner') borrowerOwners.set(fixture.slug, user)
     }
-    await store.insert('subscriptions', {
-      company_id: company.id,
-      plan_key: fixture.slug === 'meridian' ? 'borrower_pro' : 'borrower_standard',
-      status: 'active',
-      seats: fixture.users.length,
-      current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
-      external_id: null,
-    } as never)
   }
 
   // --- Lenders -------------------------------------------------------------
@@ -189,14 +181,6 @@ async function seed(store: Store): Promise<void> {
       notes: fixture.box.notes,
     } as Omit<LendingBox, 'id' | 'created_at' | 'updated_at'>)
 
-    await store.insert('subscriptions', {
-      company_id: company.id,
-      plan_key: fixture.slug === 'national' ? 'lender_enterprise' : 'lender_professional',
-      status: 'active',
-      seats: 5,
-      current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
-      external_id: null,
-    } as never)
   }
 
   // --- Deals ---------------------------------------------------------------
