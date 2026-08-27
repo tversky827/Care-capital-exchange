@@ -14,6 +14,8 @@ import { BarChart, DonutChart, ScoreRing } from '@/components/charts'
 import { MetricTile, NextAction, ReadinessBar, SeverityBadge } from '@/components/deal/common'
 import { formatCurrency, formatDate, formatPercent, formatRatio, titleize } from '@/lib/utils/format'
 import { priorityLabel } from '@/services/indications'
+import { debtMarketplaceEnabled } from '@/lib/product'
+import { RaiseNextAction } from './raise-next-action'
 
 export default async function DealOverviewPage({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params
@@ -25,12 +27,14 @@ export default async function DealOverviewPage({ params }: { params: Promise<{ d
   if (!snapshot) notFound()
 
   const store = await db()
-  const [readiness, run, discrepancies, matchCount, indicationCount] = await Promise.all([
+  const debtMarketplace = debtMarketplaceEnabled()
+  const [readiness, run, discrepancies, matchCount, indicationCount, offerings] = await Promise.all([
     readinessFor(dealId),
     latestRun(dealId),
     store.select('discrepancies', { where: { deal_id: dealId, status: 'open' } }),
     store.count('matches', { where: { deal_id: dealId, hard_fail: false } }),
     store.count('indications', { where: { deal_id: dealId, status: { in: ['submitted', 'updated', 'selected'] } } }),
+    store.select('offerings', { where: { deal_id: dealId } }),
   ])
 
   const { deal, facility, terms, summary, metrics, periods, latest, prior } = snapshot
@@ -40,7 +44,14 @@ export default async function DealOverviewPage({ params }: { params: Promise<{ d
   return (
     <div className="space-y-4">
       {/* Next action ------------------------------------------------------ */}
-      {indicationCount > 0 ? (
+      {!debtMarketplace ? (
+        <RaiseNextAction
+          dealId={dealId}
+          offerings={offerings}
+          discrepancies={discrepancies}
+          readiness={readiness}
+        />
+      ) : indicationCount > 0 ? (
         <NextAction
           tone="positive"
           headline={`${indicationCount} financing indication${indicationCount === 1 ? '' : 's'} received`}
@@ -94,13 +105,29 @@ export default async function DealOverviewPage({ params }: { params: Promise<{ d
           >
             <div className="data-grid grid-cols-2 border-t border-line sm:grid-cols-4">
               <MetricTile label="LTV" value={formatPercent(summary.ltv)} formula="loan ÷ lesser of appraised value and price" detail={summary.valueBasis ? `on ${formatCurrency(summary.valueBasis, { compact: true })} value` : undefined} />
-              <MetricTile label="Loan-to-cost" value={formatPercent(summary.loanToCost)} formula="loan ÷ total project cost" />
+              {debtMarketplace ? (
+                <MetricTile label="Loan-to-cost" value={formatPercent(summary.loanToCost)} formula="loan ÷ total project cost" />
+              ) : (
+                <MetricTile label="Total cost" value={formatCurrency(summary.totalCost, { compact: true })} formula="purchase price or payoff, plus closing costs, capex and working capital" />
+              )}
               <MetricTile label="DSCR" value={formatRatio(summary.dscr)} formula="underwritten NOI ÷ annual debt service" tone={summary.dscr !== null && summary.dscr < 1.25 ? 'critical' : summary.dscr !== null && summary.dscr >= 1.45 ? 'positive' : undefined} />
-              <MetricTile label="Debt yield" value={formatPercent(summary.debtYield)} formula="underwritten NOI ÷ loan amount" />
+              {debtMarketplace ? (
+                <MetricTile label="Debt yield" value={formatPercent(summary.debtYield)} formula="underwritten NOI ÷ loan amount" />
+              ) : (
+                <MetricTile label="Senior debt" value={formatCurrency(summary.loanAmount, { compact: true })} />
+              )}
               <MetricTile label="Underwritten NOI" value={formatCurrency(summary.noi, { compact: true })} detail={summary.noiAdjustments.length ? `${summary.noiAdjustments.length} adjustment${summary.noiAdjustments.length === 1 ? '' : 's'} applied` : undefined} />
               <MetricTile label="EBITDA margin" value={formatPercent(summary.ebitdaMargin)} />
               <MetricTile label="Annual debt service" value={formatCurrency(summary.annualDebtService, { compact: true })} detail={summary.yearOneDebtService !== summary.annualDebtService ? `${formatCurrency(summary.yearOneDebtService, { compact: true })} in year one` : undefined} />
-              <MetricTile label="Equity required" value={formatCurrency(summary.equityRequirement, { compact: true })} />
+              {debtMarketplace ? (
+                <MetricTile label="Equity required" value={formatCurrency(summary.equityRequirement, { compact: true })} />
+              ) : (
+                // Equity-to-close is legitimately zero on a cash-out refinance
+                // while the raise beneath it is for millions, and the two read
+                // as a contradiction. Occupancy is the figure both a sponsor
+                // and an investor actually watch.
+                <MetricTile label="Occupancy" value={formatPercent(metrics?.occupancy_pct ?? null)} detail={metrics?.period_label ?? undefined} />
+              )}
             </div>
           </Section>
 
@@ -217,7 +244,9 @@ export default async function DealOverviewPage({ params }: { params: Promise<{ d
               score={readiness.overall}
               canDistribute={readiness.canDistribute}
               blockingReason={readiness.blockingReason}
-              href={`/deals/${dealId}/distribute`}
+              href={debtMarketplace ? `/deals/${dealId}/distribute` : `/deals/${dealId}/equity`}
+              ready={debtMarketplace ? undefined : 'Everything an investor needs to read is on file.'}
+              action={debtMarketplace ? undefined : 'Open the raise'}
             />
           ) : null}
 

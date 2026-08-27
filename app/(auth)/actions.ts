@@ -35,7 +35,11 @@ function landingFor(actor: Actor): string {
   const debt = debtMarketplaceEnabled()
   if (actor.isAdmin) return '/admin'
   if (actor.isLender) return debt ? '/lender' : '/investments'
-  if (actor.isInvestor) return '/investments'
+  // A brand-new investor account has no profile yet, and every offering will
+  // tell them the same thing until it does. Onboarding first, marketplace after.
+  if (actor.isInvestor) {
+    return actor.investor?.onboarding_stage === 'complete' ? '/investments' : '/investor/onboarding'
+  }
   return debt ? '/dashboard' : '/deals'
 }
 

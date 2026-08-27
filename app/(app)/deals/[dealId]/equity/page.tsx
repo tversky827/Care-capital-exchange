@@ -146,7 +146,7 @@ export default async function EquityPage({
             </Card>
 
             {pending.length > 0 ? (
-              <Section title="Commitments awaiting your decision">
+              <Section title="Waiting on you">
                 <CardBody className="overflow-x-auto p-0">
                   <Table>
                     <thead>
@@ -177,7 +177,7 @@ export default async function EquityPage({
             ) : null}
 
             {accepted.length > 0 ? (
-              <Section title="Investors in this offering">
+              <Section title="Who is in">
                 <CardBody className="overflow-x-auto p-0">
                   <Table>
                     <thead>
@@ -234,7 +234,7 @@ export default async function EquityPage({
       </Alert>
 
       <Link href={`/deals/${dealId}/equity/new`}>
-        <Button>Create another offering</Button>
+        <Button>Start another raise</Button>
       </Link>
     </div>
   )

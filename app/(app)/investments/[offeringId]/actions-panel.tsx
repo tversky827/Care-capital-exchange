@@ -52,8 +52,9 @@ export function InvestorActions({
         <CardHeader><CardTitle>Want to invest?</CardTitle></CardHeader>
         <CardBody>
           <p className="text-[13px] leading-relaxed text-ink-secondary">
-            You are signed in with an account that is not set up for investing. Investing needs an
-            investor account that has been through onboarding.
+            You are reading this with an account set up for a different kind of organisation.
+            Investing needs its own account, which anyone can create — everything on this page is
+            readable either way.
           </p>
         </CardBody>
       </Card>

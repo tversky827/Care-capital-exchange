@@ -15,8 +15,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <main className="flex flex-1 items-start justify-center px-6 py-12">{children}</main>
       <footer className="border-t border-line bg-surface px-6 py-4">
         <p className="mx-auto max-w-7xl text-[11px] leading-relaxed text-ink-muted">
-          CareCapital Exchange does not lend, approve credit or commit to any financing. Financing
-          indications submitted through the platform are indications of interest, not commitments.
+          CareCapital Exchange is not a broker-dealer, investment adviser, funding portal or
+          custodian. It does not recommend investments and never holds or moves money.
         </p>
       </footer>
     </div>

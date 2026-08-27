@@ -52,6 +52,14 @@ export async function createInvestorProfile(
   input: Pick<InvestorProfile, 'display_name' | 'investor_type'> & Partial<InvestorProfile>,
 ): Promise<InvestorProfile> {
   authorize(isAvailable('INVESTOR_ONBOARDING_ENABLED'), 'Investor onboarding is not enabled.')
+  // A profile is keyed on the company, and `isInvestor` is read from the
+  // company's type. Creating one against an operator or lender company would
+  // write a row nothing ever reads again: the profile would exist and the
+  // account would still be told it cannot invest.
+  authorize(
+    actor.company.type === 'investor',
+    'Investing needs an investor account. This account is set up for a different kind of organisation.',
+  )
   const store = await db()
   const existing = await getInvestorProfile(actor.company.id)
   if (existing) return existing

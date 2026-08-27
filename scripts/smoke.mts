@@ -113,17 +113,17 @@ async function main(): Promise<void> {
 
   console.log('\nPublic routes')
   failures += await run('public', null, [
-    { path: '/', expect: 'Healthcare capital' },
+    { path: '/', expect: 'Invest in the buildings' },
     { path: '/how-it-works', expect: 'How it works' },
-    { path: '/for-borrowers', expect: 'fifteen banks' },
+    { path: '/for-borrowers', expect: 'Raise equity from investors' },
     // The lender-facing page is part of the debt marketplace, which this
     // deployment does not run.
     { path: '/for-lenders', allow: [404] },
-    { path: '/pricing', expect: 'Transaction fees' },
+    { path: '/pricing', expect: 'Transaction fees', absent: 'Lender subscription' },
     { path: '/about', expect: 'Principles' },
     { path: '/contact', expect: 'Contact' },
     { path: '/login', expect: 'Sign in' },
-    { path: '/signup', expect: 'Create your account' },
+    { path: '/signup', expect: 'Create your account', absent: 'Provide financing' },
     { path: '/dashboard', allow: [307, 302], },
   ])
 
@@ -134,7 +134,7 @@ async function main(): Promise<void> {
     // their raises instead.
     { path: '/dashboard', allow: [307, 302, 200] },
     { path: '/deals', expect: 'My raises' },
-    { path: '/deals/new', expect: 'Create a deal' },
+    { path: '/deals/new', expect: 'Add a property' },
     { path: `/deals/${dealId}`, expect: 'Underwriting metrics' },
     { path: `/deals/${dealId}/financials`, expect: 'Financial' },
     { path: `/deals/${dealId}/operations`, expect: 'Operating' },

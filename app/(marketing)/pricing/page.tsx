@@ -4,6 +4,7 @@ import { Check } from 'lucide-react'
 import { Badge, Button, Card } from '@/components/ui/primitives'
 import { FEE_SCHEDULE, PLAN_CATALOG } from '@/services/billing'
 import { formatCurrency } from '@/lib/utils/format'
+import { debtMarketplaceEnabled } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Pricing' }
 
@@ -12,39 +13,45 @@ export const metadata: Metadata = { title: 'Pricing' }
  * public page cannot drift from what the product actually charges.
  */
 export default function PricingPage() {
-  const borrowerPlans = PLAN_CATALOG.filter((plan) => plan.audience === 'borrower')
-  const lenderPlans = PLAN_CATALOG.filter((plan) => plan.audience === 'lender')
+  const operatorPlans = PLAN_CATALOG.filter((plan) => plan.audience === 'borrower')
+  // Lender subscriptions belong to the debt marketplace. Pricing a product this
+  // deployment does not sell would be the one page that contradicts the rest.
+  const lenderPlans = debtMarketplaceEnabled()
+    ? PLAN_CATALOG.filter((plan) => plan.audience === 'lender')
+    : []
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">
       <p className="eyebrow">Pricing</p>
       <h1 className="mt-2 text-[32px] font-semibold leading-tight tracking-[-0.02em] text-ink">
-        Priced so that submitting a deal is never the obstacle.
+        Priced so that putting up a raise is never the obstacle.
       </h1>
       <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
-        Borrowers can build and distribute a complete financing package at no cost. Revenue comes
-        from lender subscriptions and from transactions that actually fund.
+        It costs an investor nothing to browse, read and commit. Operators can build a complete
+        raise at no cost, and revenue comes from capital that actually funds.
       </p>
 
       <section className="mt-12">
-        <h2 className="text-[15px] font-semibold uppercase tracking-[0.05em] text-ink-muted">Borrowers</h2>
+        <h2 className="text-[15px] font-semibold uppercase tracking-[0.05em] text-ink-muted">Operators</h2>
         <div className="mt-4 grid gap-5 md:grid-cols-2">
-          {borrowerPlans.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
+          {operatorPlans.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
         </div>
       </section>
 
-      <section className="mt-12">
-        <h2 className="text-[15px] font-semibold uppercase tracking-[0.05em] text-ink-muted">Lenders</h2>
-        <div className="mt-4 grid gap-5 md:grid-cols-2">
-          {lenderPlans.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
-        </div>
-      </section>
+      {lenderPlans.length > 0 ? (
+        <section className="mt-12">
+          <h2 className="text-[15px] font-semibold uppercase tracking-[0.05em] text-ink-muted">Lenders</h2>
+          <div className="mt-4 grid gap-5 md:grid-cols-2">
+            {lenderPlans.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
+          </div>
+        </section>
+      ) : null}
 
       <Card className="mt-12 p-6">
         <h2 className="text-[16px] font-semibold text-ink">Transaction fees</h2>
         <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-ink-secondary">
-          Charged only on capital that actually funds through the platform. Nothing is charged on a
-          deal that does not close.
+          Charged only on capital that actually funds. Nothing is charged on a raise that does not
+          close.
         </p>
         <div className="mt-4 divide-y divide-line border-y border-line">
           {FEE_SCHEDULE.map((fee) => (

@@ -16,9 +16,10 @@ import type { Company, CompanyMember, CompanyType, User, UserRole } from '@/type
  * until an administrator verifies them.
  */
 
-export type Intent = 'find_financing' | 'provide_financing' | 'manage_for_clients'
+export type Intent = 'invest' | 'find_financing' | 'provide_financing' | 'manage_for_clients'
 
 const INTENT_TO_ROLE: Record<Intent, { role: UserRole; companyType: CompanyType }> = {
+  invest: { role: 'investor', companyType: 'investor' },
   find_financing: { role: 'borrower', companyType: 'borrower' },
   provide_financing: { role: 'lender', companyType: 'lender' },
   manage_for_clients: { role: 'broker', companyType: 'broker' },

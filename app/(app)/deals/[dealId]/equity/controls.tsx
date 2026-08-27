@@ -57,7 +57,7 @@ export function OfferingControls({
           disabled={checking}
           onClick={() => startCheck(async () => { setCheck(await qualityCheckAction(offeringId)) })}
         >
-          {checking ? 'Checking…' : 'Run completeness check'}
+          {checking ? 'Checking…' : 'Is it ready?'}
         </Button>
 
         {status === 'draft' || status === 'under_review' ? (
@@ -91,7 +91,7 @@ export function OfferingControls({
               <input type="hidden" name="offeringId" value={offeringId} />
               <input type="hidden" name="dealId" value={dealId} />
               <Button type="submit" size="sm" disabled={matchPending}>
-                {matchPending ? 'Scoring…' : 'Recompute matches'}
+                {matchPending ? 'Looking…' : 'Find more investors'}
               </Button>
             </form>
           </>

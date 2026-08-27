@@ -2,18 +2,24 @@
 
 import Link from 'next/link'
 import { useActionState, useState } from 'react'
-import { Building2, Handshake, Landmark } from 'lucide-react'
+import { Building2, Handshake, Landmark, PiggyBank } from 'lucide-react'
 import { Alert, Button, Card, Field, Input } from '@/components/ui/primitives'
 import { registerAction, type AuthState } from '../actions'
 import { cn } from '@/lib/utils/cn'
 
-type Intent = 'find_financing' | 'provide_financing' | 'manage_for_clients'
+type Intent = 'invest' | 'find_financing' | 'provide_financing' | 'manage_for_clients'
 
-const INTENTS: { key: Intent; label: string; detail: string; icon: typeof Building2 }[] = [
+const INTENTS: { key: Intent; label: string; detail: string; icon: typeof Building2; debtOnly?: boolean }[] = [
+  {
+    key: 'invest',
+    label: 'Invest',
+    detail: 'I want to put money into healthcare properties.',
+    icon: PiggyBank,
+  },
   {
     key: 'find_financing',
-    label: 'Find financing',
-    detail: 'I operate healthcare facilities and need debt capital.',
+    label: 'Raise capital',
+    detail: 'I operate healthcare facilities and need capital.',
     icon: Building2,
   },
   {
@@ -21,17 +27,27 @@ const INTENTS: { key: Intent; label: string; detail: string; icon: typeof Buildi
     label: 'Provide financing',
     detail: 'I lend to healthcare operators and want qualified opportunities.',
     icon: Landmark,
+    debtOnly: true,
   },
   {
     key: 'manage_for_clients',
     label: 'Manage financing for clients',
     detail: 'I am a broker or advisor placing debt on behalf of operators.',
     icon: Handshake,
+    debtOnly: true,
   },
 ]
 
-export function SignupForm({ initialIntent }: { initialIntent: Intent }) {
+export function SignupForm({
+  initialIntent, debtMarketplace = false,
+}: {
+  initialIntent: Intent
+  debtMarketplace?: boolean
+}) {
   const [intent, setIntent] = useState<Intent>(initialIntent)
+  // Offering to sign up for a workspace this deployment does not run would
+  // create an account with nowhere to go.
+  const options = INTENTS.filter((option) => debtMarketplace || !option.debtOnly)
   const [state, submit, pending] = useActionState<AuthState, FormData>(registerAction, {})
   // Restored after a rejected submission so nobody has to retype the form.
   const kept = state.values ?? {}
@@ -49,7 +65,7 @@ export function SignupForm({ initialIntent }: { initialIntent: Intent }) {
             What are you here to do?
           </legend>
           <div className="space-y-2">
-            {INTENTS.map((option) => (
+            {options.map((option) => (
               <label
                 key={option.key}
                 className={cn(
@@ -124,9 +140,9 @@ export function SignupForm({ initialIntent }: { initialIntent: Intent }) {
         </Button>
 
         <p className="text-[11px] leading-relaxed text-ink-muted">
-          By creating an account you acknowledge that CareCapital Exchange does not lend, approve
-          credit or commit to any financing, and that financing indications submitted through the
-          platform are indications of interest rather than commitments.
+          By creating an account you acknowledge that CareCapital Exchange is not a broker-dealer,
+          investment adviser, funding portal or custodian, that it does not recommend investments,
+          and that anything you record here is a statement of intent rather than a transaction.
         </p>
       </form>
 

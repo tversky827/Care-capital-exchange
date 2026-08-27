@@ -5,8 +5,7 @@ import { getActor } from '@/lib/auth/session'
 
 const NAV = [
   { href: '/how-it-works', label: 'How it works' },
-  { href: '/for-borrowers', label: 'For borrowers' },
-  { href: '/for-lenders', label: 'For lenders' },
+  { href: '/for-borrowers', label: 'For operators' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/about', label: 'About' },
 ]
@@ -41,7 +40,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
                   <Button variant="ghost" size="sm">Sign in</Button>
                 </Link>
                 <Link href="/signup">
-                  <Button variant="primary" size="sm">Submit a deal</Button>
+                  <Button variant="primary" size="sm">Get started</Button>
                 </Link>
               </>
             )}
@@ -57,16 +56,15 @@ export default async function MarketingLayout({ children }: { children: React.Re
             <div>
               <Logo />
               <p className="mt-3 max-w-xs text-[12px] leading-relaxed text-ink-muted">
-                Healthcare capital, intelligently matched. An institutional financing platform for
-                skilled nursing and the wider healthcare sector.
+                A marketplace for private investments in healthcare property. Investors see what
+                the operator filed; operators raise from investors who want what they have.
               </p>
             </div>
             <FooterColumn
               title="Product"
               links={[
                 { href: '/how-it-works', label: 'How it works' },
-                { href: '/for-borrowers', label: 'For borrowers' },
-                { href: '/for-lenders', label: 'For lenders' },
+                { href: '/for-borrowers', label: 'For operators' },
                 { href: '/pricing', label: 'Pricing' },
               ]}
             />
@@ -88,13 +86,15 @@ export default async function MarketingLayout({ children }: { children: React.Re
 
           <div className="mt-10 border-t border-line pt-6">
             <p className="max-w-4xl text-[11px] leading-relaxed text-ink-muted">
-              CareCapital Exchange facilitates connections between healthcare operators seeking
-              financing and lenders. It does not originate, approve, underwrite for its own account,
-              guarantee or commit to any loan, and nothing on this platform is an offer of credit.
-              Financing indications submitted through the platform are indications of interest, not
-              commitments to lend. Nothing here is legal, tax, accounting or investment advice.
-              All figures, companies, facilities and institutions shown in the product demonstration
-              are fictional.
+              CareCapital Exchange connects healthcare operators raising capital with investors
+              considering it. It is not a broker-dealer, investment adviser, funding portal or
+              custodian; it does not recommend investments, hold investor money, or effect
+              securities transactions. Everything shown about an investment comes from the
+              operator&rsquo;s own submission. Private investments are illiquid, forward-looking
+              figures are projections rather than forecasts or promises, and an investor can lose
+              their entire investment. Nothing here is legal, tax, accounting or investment advice.
+              All figures, companies, facilities and institutions shown in the product
+              demonstration are fictional.
             </p>
             <p className="mt-4 text-[11px] text-ink-muted">
               © {new Date().getFullYear()} CareCapital Exchange.

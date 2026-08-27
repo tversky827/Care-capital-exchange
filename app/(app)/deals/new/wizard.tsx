@@ -22,7 +22,7 @@ import { titleize } from '@/lib/utils/format'
  */
 
 const STEPS = [
-  { key: 'transaction', label: 'Transaction', hint: 'What kind of financing, on what kind of asset.' },
+  { key: 'transaction', label: 'Transaction', hint: 'What kind of deal, on what kind of property.' },
   { key: 'facility', label: 'Facility', hint: 'Where it is, how big it is, and who operates it.' },
   { key: 'operating', label: 'Operations', hint: 'Trailing performance, census and payer mix.' },
   { key: 'terms', label: 'Capital', hint: 'Price, request, existing debt and the capital plan.' },
@@ -46,11 +46,12 @@ export function DealWizard({ defaultLegalEntity }: { defaultLegalEntity: string 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
-        <p className="eyebrow">New financing opportunity</p>
-        <h1 className="mt-1 text-[20px] font-semibold text-ink">Create a deal</h1>
+        <p className="eyebrow">New property</p>
+        <h1 className="mt-1 text-[20px] font-semibold text-ink">Add a property</h1>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-ink-secondary">
-          Only the facility name and state are required to start. Everything else can be added later —
-          the readiness checklist will tell you exactly what lenders still need.
+          Only the facility name and state are required to start. Everything else can be added
+          later — the readiness checklist will tell you exactly what is still outstanding before
+          you can open a raise against it.
         </p>
       </div>
 
@@ -235,7 +236,7 @@ export function DealWizard({ defaultLegalEntity }: { defaultLegalEntity: string 
           <fieldset className="mt-5">
             <legend className="text-[12px] font-medium text-ink-secondary">Payer mix (%)</legend>
             <p className="mt-0.5 text-[11px] text-ink-muted">
-              Medicaid concentration determines which lenders can participate at all, so this is worth
+              Medicaid concentration is the single biggest driver of how an investor reads risk, so this is worth
               getting right.
             </p>
             <div className="mt-2 grid gap-4 sm:grid-cols-5">
@@ -322,7 +323,7 @@ export function DealWizard({ defaultLegalEntity }: { defaultLegalEntity: string 
             <Field
               label="Any prior defaults?"
               htmlFor="priorDefaults"
-              hint="Disclosing up front is materially better than a lender finding it in diligence."
+              hint="Disclosing up front is materially better than an investor finding it in diligence."
             >
               <Select id="priorDefaults" name="priorDefaults" defaultValue="no">
                 <option value="no">No</option>
@@ -353,10 +354,10 @@ export function DealWizard({ defaultLegalEntity }: { defaultLegalEntity: string 
             className="mt-5"
             label="Marketplace confidentiality"
             htmlFor="anonymize"
-            hint="When on, lenders browsing the marketplace see only the asset type, size and state — never the facility name — until you distribute the deal to them directly."
+            hint="When on, people browsing the marketplace see only the asset type, size and state — never the facility name — until you release it to them directly."
           >
             <Select id="anonymize" name="anonymize" defaultValue="on">
-              <option value="on">Anonymise on the marketplace (recommended)</option>
+              <option value="on">Hide the facility name until I release it (recommended)</option>
               <option value="off">Show the facility name</option>
             </Select>
           </Field>
@@ -390,7 +391,7 @@ export function DealWizard({ defaultLegalEntity }: { defaultLegalEntity: string 
               </Button>
             ) : (
               <Button type="submit" variant="primary" disabled={pending || !step2Complete}>
-                {pending ? 'Creating…' : 'Create deal'}
+                {pending ? 'Adding…' : 'Add this property'}
               </Button>
             )}
           </div>

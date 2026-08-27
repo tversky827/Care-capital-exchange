@@ -140,13 +140,24 @@ export function ConfidenceBadge({ confidence }: { confidence: number | null }) {
   )
 }
 
+/**
+ * How complete the record is, and the one thing to do about it.
+ *
+ * The `ready` copy differs by product because "ready" means a different thing
+ * in each: a package a lender can be sent, or a record an investor can be
+ * shown. The threshold behind it is the same either way.
+ */
 export function ReadinessBar({
-  score, canDistribute, blockingReason, href,
+  score, canDistribute, blockingReason, href, ready, action,
 }: {
   score: number
   canDistribute: boolean
   blockingReason: string | null
   href: string
+  /** What being ready means here. */
+  ready?: string
+  /** What to do about being ready. */
+  action?: string
 }) {
   const tone = canDistribute ? 'positive' : score >= 60 ? 'warning' : 'critical'
   return (
@@ -154,15 +165,15 @@ export function ReadinessBar({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[12px] font-semibold text-ink">
-            Deal readiness <span className="tnum">{score}%</span>
+            Record complete <span className="tnum">{score}%</span>
           </p>
           <p className="mt-0.5 text-[11px] leading-snug text-ink-muted">
-            {canDistribute ? 'This package is ready for lender distribution.' : blockingReason}
+            {canDistribute ? (ready ?? 'This package is ready for lender distribution.') : blockingReason}
           </p>
         </div>
         <Link href={href}>
           <Button size="sm" variant={canDistribute ? 'primary' : 'secondary'}>
-            {canDistribute ? 'Distribute deal' : 'Review checklist'}
+            {canDistribute ? (action ?? 'Distribute deal') : 'Review checklist'}
           </Button>
         </Link>
       </div>

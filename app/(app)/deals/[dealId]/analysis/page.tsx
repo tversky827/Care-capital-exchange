@@ -68,9 +68,9 @@ export default async function AnalysisPage({ params }: { params: Promise<{ dealI
   return (
     <div className="space-y-4">
       <Alert tone="neutral" title="This is analysis, not a credit decision">
-        CareCapital Exchange does not lend, approve credit or commit to any financing. What follows is
-        decision support prepared from the information on this deal, for the borrower and for lenders
-        conducting their own underwriting.
+        CareCapital Exchange does not recommend investments and does not decide credit. What follows
+        is decision support prepared from the information on this deal, for the operator and for
+        anyone conducting their own analysis of it.
       </Alert>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.6fr]">

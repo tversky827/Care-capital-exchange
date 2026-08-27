@@ -84,7 +84,9 @@ export default async function DealLayout({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <DealStatusBadge status={deal.status} />
+            {/* The deal status taxonomy tracks a loan through a lender
+                pipeline. Without that pipeline it says nothing true. */}
+            {debtMarketplace ? <DealStatusBadge status={deal.status} /> : null}
             <Link href={`/deals/${dealId}/ask`}>
               <Button size="sm">Ask a question</Button>
             </Link>
@@ -99,11 +101,30 @@ export default async function DealLayout({
         </div>
 
         <dl className="data-grid grid-cols-2 border-t border-line sm:grid-cols-3 lg:grid-cols-6">
-          <HeaderMetric label="Requested" value={formatCurrency(summary.loanAmount, { compact: true })} />
-          <HeaderMetric label="LTV" value={formatPercent(summary.ltv)} />
-          <HeaderMetric label="DSCR" value={formatRatio(summary.dscr)} />
-          <HeaderMetric label="Debt yield" value={formatPercent(summary.debtYield)} />
-          <HeaderMetric label="Underwritten NOI" value={formatCurrency(summary.noi, { compact: true })} />
+          {debtMarketplace ? (
+            <>
+              <HeaderMetric label="Requested" value={formatCurrency(summary.loanAmount, { compact: true })} />
+              <HeaderMetric label="LTV" value={formatPercent(summary.ltv)} />
+              <HeaderMetric label="DSCR" value={formatRatio(summary.dscr)} />
+              <HeaderMetric label="Debt yield" value={formatPercent(summary.debtYield)} />
+              <HeaderMetric label="Underwritten NOI" value={formatCurrency(summary.noi, { compact: true })} />
+            </>
+          ) : (
+            <>
+              {/* What a sponsor raising equity is actually working with. Debt
+                  yield is a lender's screening ratio and means nothing here.
+                  The sources-and-uses equity gap is deliberately not shown:
+                  on a cash-out refinance it is legitimately zero while the
+                  raise beneath it is for millions, and the two figures
+                  side by side read as a contradiction rather than as the two
+                  different questions they answer. */}
+              <HeaderMetric label="Total cost" value={formatCurrency(summary.totalCost, { compact: true })} />
+              <HeaderMetric label="Senior debt" value={formatCurrency(summary.loanAmount, { compact: true })} />
+              <HeaderMetric label="Value" value={formatCurrency(summary.valueBasis, { compact: true })} />
+              <HeaderMetric label="Yearly profit" value={formatCurrency(summary.noi, { compact: true })} />
+              <HeaderMetric label="Covers debt by" value={formatRatio(summary.dscr)} />
+            </>
+          )}
           <div className="px-3 py-2">
             <dt className="text-[10px] uppercase tracking-[0.05em] text-ink-muted">Readiness</dt>
             <dd className="mt-1.5">
