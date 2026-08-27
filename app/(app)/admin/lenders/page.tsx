@@ -5,6 +5,7 @@ import { db } from '@/db'
 import { Badge, Card, CardBody, PageHeader, Section, Table, Td, Th, Tr } from '@/components/ui/primitives'
 import { VerificationControl } from './verification-control'
 import { formatCurrency, formatDate, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Lender verification' }
 
@@ -16,6 +17,7 @@ export const metadata: Metadata = { title: 'Lender verification' }
  * to make that decision, including what the institution has published.
  */
 export default async function AdminLendersPage() {
+  requireDebtMarketplace()
   await requireAdmin()
   const [lenders, store] = await Promise.all([allLenders(), db()])
 

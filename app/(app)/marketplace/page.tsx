@@ -18,6 +18,7 @@ import { MarketplaceFilters } from './filters'
 import { SavedSearches } from './saved-searches'
 import { formatCurrency, formatPercent, formatRatio, titleize } from '@/lib/utils/format'
 import { ASSET_TYPES, TRANSACTION_TYPES } from '@/types'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Marketplace' }
 
@@ -38,6 +39,7 @@ export default async function MarketplacePage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  requireDebtMarketplace()
   const actor = await requireActor()
   if (!actor.isLender && !actor.isAdmin) redirect('/dashboard')
 

@@ -35,7 +35,7 @@ export function MarketplaceFilters({ total, showing }: { total: number; showing:
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Input
-            placeholder="Search offerings…"
+            placeholder="Search by name or place…"
             defaultValue={params.get('q') ?? ''}
             className="w-56"
             onKeyDown={(event) => {
@@ -78,7 +78,7 @@ export function MarketplaceFilters({ total, showing }: { total: number; showing:
               onBlur={(event) => apply({ state: event.target.value.toUpperCase() })}
             />
           </Field>
-          <Field label="Maximum minimum investment" htmlFor="min-filter">
+          <Field label="I can invest up to" htmlFor="min-filter">
             <Input
               id="min-filter"
               inputMode="numeric"
@@ -88,7 +88,7 @@ export function MarketplaceFilters({ total, showing }: { total: number; showing:
             />
           </Field>
           <div>
-            <Label>Capital position</Label>
+            <Label>Type of equity</Label>
             <Select
               className="mt-1"
               defaultValue={params.get('position') ?? ''}
@@ -100,7 +100,7 @@ export function MarketplaceFilters({ total, showing }: { total: number; showing:
               <option value="mezzanine">Mezzanine</option>
             </Select>
           </div>
-          <Field label="Maximum hold, years" htmlFor="hold-filter">
+          <Field label="Held for no more than, years" htmlFor="hold-filter">
             <Input
               id="hold-filter"
               inputMode="numeric"
@@ -109,7 +109,7 @@ export function MarketplaceFilters({ total, showing }: { total: number; showing:
               onBlur={(event) => apply({ maxHold: event.target.value })}
             />
           </Field>
-          <Field label="Minimum target return, %" htmlFor="return-filter">
+          <Field label="Target return of at least, %" htmlFor="return-filter">
             <Input
               id="return-filter"
               inputMode="numeric"
@@ -151,44 +151,5 @@ export function SaveButton({ offeringId, saved }: { offeringId: string; saved: b
         {saved ? 'Saved' : 'Save'}
       </button>
     </form>
-  )
-}
-
-/** Selects offerings to compare. Capped at four, which is what fits legibly. */
-export function CompareBar({ ids }: { ids: string[] }) {
-  const router = useRouter()
-  const [selected, setSelected] = useState<string[]>([])
-
-  const toggle = (id: string) => {
-    setSelected((current) => current.includes(id)
-      ? current.filter((value) => value !== id)
-      : current.length >= 4 ? current : [...current, id])
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-2 rounded border border-line bg-surface-sunken px-3 py-2">
-      <span className="text-[12px] text-ink-muted">Compare up to four:</span>
-      {ids.map((id, index) => (
-        <button
-          key={id}
-          type="button"
-          onClick={() => toggle(id)}
-          className={`rounded border px-2 py-0.5 text-[11px] ${
-            selected.includes(id) ? 'border-accent bg-accent-soft text-accent' : 'border-line text-ink-muted'
-          }`}
-        >
-          {index + 1}
-        </button>
-      ))}
-      <Button
-        type="button"
-        size="sm"
-        variant="primary"
-        disabled={selected.length < 2}
-        onClick={() => router.push(`/investments/compare?ids=${selected.join(',')}`)}
-      >
-        Compare {selected.length > 0 ? `(${selected.length})` : ''}
-      </Button>
-    </div>
   )
 }

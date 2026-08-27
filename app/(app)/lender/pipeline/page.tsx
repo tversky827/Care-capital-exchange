@@ -11,10 +11,12 @@ import { displayName } from '@/lib/deal/display'
 import { Alert, Card, EmptyState } from '@/components/ui/primitives'
 import { PipelineBoard } from './board'
 import { formatCurrency, formatPercent, formatRatio } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Pipeline' }
 
 export default async function PipelinePage() {
+  requireDebtMarketplace()
   const actor = await requireActor()
   if (!actor.isLender) redirect(actor.isAdmin ? '/admin' : '/dashboard')
   const lender = actor.lender

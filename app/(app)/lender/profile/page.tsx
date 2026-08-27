@@ -6,6 +6,7 @@ import { publicProfile } from '@/services/lenders'
 import { Alert, Badge, CardBody, Section } from '@/components/ui/primitives'
 import { ProfileForm } from './form'
 import { formatCurrency, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Institution profile' }
 
@@ -17,6 +18,7 @@ export const metadata: Metadata = { title: 'Institution profile' }
  * uses, so what is shown here is literally what a borrower would get.
  */
 export default async function LenderProfilePage() {
+  requireDebtMarketplace()
   const actor = await requireActor()
   if (!actor.isLender) redirect(actor.isAdmin ? '/admin' : '/dashboard')
   const lender = actor.lender

@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Button, Card } from '@/components/ui/primitives'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'For lenders' }
 
 export default function ForLendersPage() {
+  requireDebtMarketplace()
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <p className="eyebrow">For lenders</p>

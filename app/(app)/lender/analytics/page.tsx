@@ -7,10 +7,12 @@ import { Card, CardBody, Section } from '@/components/ui/primitives'
 import { BarChart } from '@/components/charts'
 import { MetricTile } from '@/components/deal/common'
 import { formatCurrency, formatPercent, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Lender analytics' }
 
 export default async function LenderAnalyticsPage() {
+  requireDebtMarketplace()
   const actor = await requireActor()
   if (!actor.isLender) redirect(actor.isAdmin ? '/admin' : '/dashboard')
   const lender = actor.lender

@@ -7,11 +7,13 @@ import { assetNoun, stateName } from '@/lib/deal/display'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { formatCurrency, formatPercent, formatRatio } from '@/lib/utils/format'
 import {
-  Alert, Badge, Card, CardBody, CardHeader, CardTitle, DefinitionList, Section, Table, Td, Th, Tr,
+  Alert, Badge, Card, CardBody, DefinitionList, Progress, Section, Table, Td, Th, Tr,
 } from '@/components/ui/primitives'
 import { CapitalStackChart } from '@/components/equity/capital-stack-chart'
 import { InvestorActions } from './actions-panel'
 import { AskPanel } from './ask-panel'
+import { BearCase } from './bear-case'
+import { Disclose } from './disclose'
 import { analyzeOffering, INVESTOR_SUGGESTED_QUESTIONS } from '@/services/equity/analysis'
 import { activeStack } from '@/services/equity/capital-stack'
 import { dataRoomFor, lockedCounts } from '@/services/equity/data-room'
@@ -24,11 +26,15 @@ export const dynamic = 'force-dynamic'
 /**
  * The investment detail page.
  *
- * Ordered so an investor can answer the questions that matter within a minute:
- * what it is, what it costs to participate, what the sponsor projects, what
- * could go wrong, who is running it, and what they can read. Risks are not
- * below the fold as an afterthought — they sit between the projections and the
- * sponsor, where someone reading in order will meet them.
+ * Four questions in order: what is it, what could it pay, what could go wrong,
+ * and who is running it. Everything an investor needs to *decide whether to
+ * keep reading* is above the fold; everything they need to *do the reading* is
+ * one disclosure away underneath.
+ *
+ * The detail was previously all open at once — ten stacked sections, four
+ * tables, and five action panels beside them — which meant the risks and the
+ * projections competed with a facility bed count for the same attention. Now
+ * the summary of each is always visible and the workings open on request.
  *
  * Every projected figure is computed by the deterministic engine and carries
  * its assumptions. Nothing here is described as expected, safe or guaranteed.
@@ -58,29 +64,44 @@ export default async function OfferingPage({
   if (!snapshot) notFound()
 
   let eligibility: EligibilityResult | null = null
+  let hasInterest = false
+  let committed: number | null = null
   if (actor.investor) {
-    eligibility = await evaluateEligibility(actor, offeringId).catch(() => null)
+    const investorId = actor.investor.id
+    const [result, interest, commitments] = await Promise.all([
+      evaluateEligibility(actor, offeringId).catch(() => null),
+      store.selectOne('investment_interests', { where: { offering_id: offeringId, investor_id: investorId } }),
+      store.select('investment_commitments', { where: { offering_id: offeringId, investor_id: investorId } }),
+    ])
+    eligibility = result
+    hasInterest = Boolean(interest && !interest.withdrawn_at && interest.expressed_at)
+    // Withdrawn and rejected commitments are not "you are in"; anything still
+    // standing is, and its amount is what the investor should be shown.
+    const live = commitments.filter((c) => ['submitted', 'accepted', 'funded'].includes(c.status))
+    committed = live.length > 0 ? live.reduce((total, c) => total + c.amount, 0) : null
   }
 
   const { deal, facility, sponsor, summary, latest, prior } = snapshot
   const beds = facility?.operating_beds ?? facility?.licensed_beds ?? null
   const projection = analysis?.projection ?? null
   const risk = analysis?.risk ?? null
+  const raised = offering.target_raise && offering.target_raise > 0
+    ? (offering.committed_amount / offering.target_raise) * 100
+    : null
 
   return (
     <div className="space-y-5">
-      {/* ---- header ------------------------------------------------------- */}
+      {/* ---- header: the four figures a decision starts from --------------- */}
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wide text-ink-muted">{offering.reference}</p>
-            <h1 className="mt-1 text-[22px] font-semibold text-ink">{offering.name}</h1>
+            <h1 className="text-[22px] font-semibold text-ink">{offering.name}</h1>
             <p className="mt-1 text-[13px] text-ink-secondary">
               {[
                 facility?.state ? stateName(facility.state) : null,
                 assetNoun(deal.asset_type),
                 beds ? `${beds} beds` : null,
-                terms?.capital_position === 'preferred_equity' ? 'Preferred equity offering' : 'Common equity offering',
+                terms?.capital_position === 'preferred_equity' ? 'Preferred equity' : 'Common equity',
               ].filter(Boolean).join(' · ')}
             </p>
           </div>
@@ -90,114 +111,56 @@ export default async function OfferingPage({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded border border-line bg-line md:grid-cols-4">
-          <HeaderStat label="Target raise" value={formatCurrency(offering.target_raise)} />
-          <HeaderStat label="Minimum investment" value={formatCurrency(offering.minimum_investment)} />
           <HeaderStat
-            label="Target hold"
-            value={terms?.target_hold_months ? `${Math.round(terms.target_hold_months / 12)} years` : '—'}
+            label="Target return"
+            value={terms?.target_irr_pct ? formatPercent(terms.target_irr_pct) : '—'}
+            hint="a year, projected"
           />
           <HeaderStat
-            label="Committed"
+            label="Minimum"
+            value={formatCurrency(offering.minimum_investment, { compact: true })}
+            hint="to take part"
+          />
+          <HeaderStat
+            label="Money is tied up"
+            value={terms?.target_hold_months ? `${Math.round(terms.target_hold_months / 12)} years` : '—'}
+            hint="target, could be longer"
+          />
+          <HeaderStat
+            label="Raised so far"
             value={`${formatCurrency(offering.committed_amount, { compact: true })}${
               offering.target_raise ? ` of ${formatCurrency(offering.target_raise, { compact: true })}` : ''
             }`}
           />
         </div>
+        {raised !== null ? <Progress className="mt-3" value={raised} showLabel /> : null}
       </Card>
 
       <Alert tone="neutral">
-        This is an offering of unregistered securities in a private company. It is illiquid, you may
-        lose your entire investment, and every forward-looking figure below is a projection derived
+        This is a private investment. Your money is committed for years, there is no market to sell
+        your stake in, and you could lose all of it. Every forward-looking figure below is projected
         from assumptions the sponsor has stated — not a forecast, and not a promise. CareCapital
         Exchange is not your broker or adviser and does not recommend this or any investment.
       </Alert>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
-          {/* ---- thesis --------------------------------------------------- */}
+          {/* ---- what it is ------------------------------------------------ */}
           {analysis ? (
-            <Section title="Investment thesis" description={`Prepared by the ${analysis.generatedBy} analyst from the deal record.`}>
+            <Section title="What this is">
               <CardBody>
                 <p className="text-[13px] leading-relaxed text-ink-secondary">{analysis.analysis.thesis}</p>
+                <p className="mt-2 text-[11px] text-ink-muted">
+                  Written by the {analysis.generatedBy} analyst from the sponsor&rsquo;s own filings.
+                </p>
               </CardBody>
             </Section>
           ) : null}
 
-          {/* ---- deal overview -------------------------------------------- */}
-          <Section title="Transaction">
-            <CardBody>
-              <DefinitionList
-                items={[
-                  { label: 'Purchase price', value: formatCurrency(snapshot.terms?.purchase_price ?? null) },
-                  { label: 'Senior debt', value: formatCurrency(summary.loanAmount) },
-                  { label: 'Total equity required', value: formatCurrency(summary.equityRequirement) },
-                  { label: 'This offering', value: formatCurrency(offering.target_raise) },
-                  { label: 'Total capitalisation', value: formatCurrency(summary.totalCost) },
-                  { label: 'Issuer', value: offering.issuer_entity ?? 'Not stated' },
-                  { label: 'Structure', value: offering.legal_structure ?? 'Not stated' },
-                ]}
-              />
-            </CardBody>
-          </Section>
-
-          {/* ---- capital stack -------------------------------------------- */}
-          {stack ? (
-            <Section title="Capital stack" description="Where this investment sits in the order of repayment.">
-              <CardBody>
-                <CapitalStackChart sources={stack.sources} total={stack.total} />
-              </CardBody>
-            </Section>
-          ) : null}
-
-          {/* ---- facility -------------------------------------------------- */}
-          <Section title="Facility">
-            <CardBody>
-              <DefinitionList
-                items={[
-                  { label: 'Licensed beds', value: facility?.licensed_beds?.toString() ?? '—' },
-                  { label: 'Operating beds', value: facility?.operating_beds?.toString() ?? '—' },
-                  { label: 'Occupancy', value: formatPercent(snapshot.metrics?.occupancy_pct ?? null) },
-                  { label: 'Medicaid share', value: formatPercent(snapshot.metrics?.medicaid_pct ?? null) },
-                  { label: 'Medicare share', value: formatPercent(snapshot.metrics?.medicare_pct ?? null) },
-                  { label: 'Year built', value: facility?.year_built?.toString() ?? '—' },
-                ]}
-              />
-            </CardBody>
-          </Section>
-
-          {/* ---- historical, kept apart from projected --------------------- */}
+          {/* ---- what it could pay ----------------------------------------- */}
           <Section
-            title="Historical performance"
-            description="Reported results. These are actual figures from the operator's statements, not projections."
-          >
-            <CardBody className="overflow-x-auto p-0">
-              <Table>
-                <thead>
-                  <Tr>
-                    <Th>Line item</Th>
-                    <Th numeric>{prior?.period.label ?? 'Prior'}</Th>
-                    <Th numeric>{latest?.period.label ?? 'Latest'}</Th>
-                  </Tr>
-                </thead>
-                <tbody>
-                  <MoneyRow label="Revenue" prior={prior?.items.revenue} latest={latest?.items.revenue} />
-                  <MoneyRow label="EBITDA" prior={prior?.items.ebitda} latest={latest?.items.ebitda} />
-                  <MoneyRow label="Labour cost" prior={prior?.items.labor_expense} latest={latest?.items.labor_expense} />
-                  <MoneyRow label="Agency labour" prior={prior?.items.agency_labor} latest={latest?.items.agency_labor} />
-                  <Tr>
-                    <Td>Underwritten NOI</Td>
-                    <Td numeric>—</Td>
-                    <Td numeric>{formatCurrency(summary.noi)}</Td>
-                  </Tr>
-                </tbody>
-              </Table>
-            </CardBody>
-          </Section>
-
-          {/* ---- projections ---------------------------------------------- */}
-          <Section
-            title="Projected performance"
-            description="Every figure below is projected from the assumptions listed, not a forecast of what will happen."
+            title="What it could pay"
+            description="Projected from the assumptions the sponsor stated. Not a forecast of what will happen."
           >
             <CardBody className="space-y-4">
               {projection === null || projection.insufficientData !== null ? (
@@ -207,47 +170,49 @@ export default async function OfferingPage({
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-line bg-line md:grid-cols-4">
-                    <HeaderStat label="Projected IRR" value={formatPercent(projection.irrPct)} tag="Projected" />
-                    <HeaderStat label="Projected multiple" value={formatRatio(projection.equityMultiple)} tag="Projected" />
-                    <HeaderStat label="Avg. cash on cash" value={formatPercent(projection.averageCashOnCashPct)} tag="Projected" />
-                    <HeaderStat label="Projected exit value" value={formatCurrency(projection.exitValue, { compact: true })} tag="Projected" />
+                    <HeaderStat label="Return a year" value={formatPercent(projection.irrPct)} hint="projected IRR" />
+                    <HeaderStat label="On every dollar" value={formatRatio(projection.equityMultiple)} hint="projected, over the hold" />
+                    <HeaderStat label="Paid out yearly" value={formatPercent(projection.averageCashOnCashPct)} hint="projected average" />
+                    <HeaderStat label="Sale value" value={formatCurrency(projection.exitValue, { compact: true })} hint="projected at exit" />
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <thead>
-                        <Tr>
-                          <Th>Year</Th>
-                          <Th numeric>NOI</Th>
-                          <Th numeric>Debt service</Th>
-                          <Th numeric>DSCR</Th>
-                          <Th numeric>Cash to equity</Th>
-                          <Th numeric>Debt balance</Th>
-                        </Tr>
-                      </thead>
-                      <tbody>
-                        {projection.years.map((year) => (
-                          <Tr key={year.year}>
-                            <Td>Year {year.year}</Td>
-                            <Td numeric>{formatCurrency(year.noi)}</Td>
-                            <Td numeric>{formatCurrency(year.debtService)}</Td>
-                            <Td numeric>{formatRatio(year.dscr)}</Td>
-                            <Td numeric>{formatCurrency(year.cashFlowToEquity)}</Td>
-                            <Td numeric>{formatCurrency(year.debtBalance)}</Td>
+                  <Disclose summary="Show the year-by-year working">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <thead>
+                          <Tr>
+                            <Th>Year</Th>
+                            <Th numeric>NOI</Th>
+                            <Th numeric>Debt service</Th>
+                            <Th numeric>DSCR</Th>
+                            <Th numeric>Cash to equity</Th>
+                            <Th numeric>Debt balance</Th>
                           </Tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {projection.years.map((year) => (
+                            <Tr key={year.year}>
+                              <Td>Year {year.year}</Td>
+                              <Td numeric>{formatCurrency(year.noi)}</Td>
+                              <Td numeric>{formatCurrency(year.debtService)}</Td>
+                              <Td numeric>{formatRatio(year.dscr)}</Td>
+                              <Td numeric>{formatCurrency(year.cashFlowToEquity)}</Td>
+                              <Td numeric>{formatCurrency(year.debtBalance)}</Td>
+                            </Tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </div>
 
-                  <div>
-                    <h4 className="text-[12px] font-semibold text-ink">Assumptions behind these figures</h4>
-                    <ul className="mt-2 grid gap-1 text-[12px] text-ink-muted sm:grid-cols-2">
-                      {projection.assumptionsUsed.map((a) => (
-                        <li key={a.label}>{a.label}: <span className="text-ink-secondary">{a.value}</span></li>
-                      ))}
-                    </ul>
-                  </div>
+                    <div className="mt-3">
+                      <h4 className="text-[12px] font-semibold text-ink">What those figures assume</h4>
+                      <ul className="mt-2 grid gap-1 text-[12px] text-ink-muted sm:grid-cols-2">
+                        {projection.assumptionsUsed.map((a) => (
+                          <li key={a.label}>{a.label}: <span className="text-ink-secondary">{a.value}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                  </Disclose>
 
                   <p className="text-[11px] leading-relaxed text-ink-muted">
                     Projections are estimates and are not guarantees of future performance. Actual
@@ -258,15 +223,15 @@ export default async function OfferingPage({
             </CardBody>
           </Section>
 
-          {/* ---- risks ----------------------------------------------------- */}
+          {/* ---- what could go wrong ---------------------------------------- */}
           {risk ? (
             <Section
-              title="Risks"
+              title="What could go wrong"
               description={`Scored from the deal's own figures. ${Math.round(risk.coverage * 100)}% of the expected inputs were available.`}
             >
               <CardBody className="space-y-3">
-                <div className="flex items-center gap-3 border-b border-line pb-3">
-                  <div className="text-[26px] font-semibold tabular-nums text-ink">{risk.overallScore}</div>
+                <div className="flex items-center gap-3">
+                  <div className="tnum text-[26px] font-semibold text-ink">{risk.overallScore}</div>
                   <div>
                     <Badge tone={risk.overallBand === 'high' ? 'critical' : risk.overallBand === 'medium' ? 'warning' : 'positive'}>
                       {risk.overallBand} risk
@@ -277,39 +242,123 @@ export default async function OfferingPage({
                     </p>
                   </div>
                 </div>
-                {risk.categories.map((category) => (
-                  <div key={category.category} className="border-b border-line pb-2.5 last:border-b-0 last:pb-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[13px] font-medium capitalize text-ink">{category.category}</span>
-                      <Badge tone={category.band === 'high' ? 'critical' : category.band === 'medium' ? 'warning' : 'positive'}>
-                        {category.available ? category.band : 'no data'}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-[12px] leading-relaxed text-ink-muted">{category.rationale}</p>
+
+                <Disclose summary={`Show all ${risk.categories.length} risks in detail`}>
+                  <div className="space-y-2.5">
+                    {risk.categories.map((category) => (
+                      <div key={category.category} className="border-b border-line pb-2.5 last:border-b-0 last:pb-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[13px] font-medium capitalize text-ink">{category.category}</span>
+                          <Badge tone={category.band === 'high' ? 'critical' : category.band === 'medium' ? 'warning' : 'positive'}>
+                            {category.available ? category.band : 'no data'}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-[12px] leading-relaxed text-ink-muted">{category.rationale}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </Disclose>
+
+                <BearCase offeringId={offeringId} />
               </CardBody>
             </Section>
           ) : null}
 
-          {/* ---- sponsor ---------------------------------------------------- */}
-          <Section title="Sponsor">
-            <CardBody>
-              <DefinitionList
-                items={[
-                  { label: 'Entity', value: sponsor?.legal_entity ?? 'Not stated' },
-                  { label: 'Years in healthcare', value: sponsor?.years_in_healthcare?.toString() ?? '—' },
-                  { label: 'Facilities operated', value: sponsor?.facilities_operated?.toString() ?? '—' },
-                  { label: 'Beds under management', value: sponsor?.beds_operated?.toString() ?? '—' },
-                  { label: 'States', value: sponsor?.states_operated.join(', ') || '—' },
-                  { label: 'Prior acquisitions', value: sponsor?.historical_acquisitions?.toString() ?? '—' },
-                ]}
-              />
+          {/* ---- the underlying record -------------------------------------- */}
+          <Section
+            title="The property and the deal"
+            description="Everything behind the figures above, as the sponsor filed it."
+          >
+            <CardBody className="space-y-3">
+              <Disclose summary="How the purchase is being paid for">
+                <DefinitionList
+                  items={[
+                    { label: 'Purchase price', value: formatCurrency(snapshot.terms?.purchase_price ?? null) },
+                    { label: 'Senior debt', value: formatCurrency(summary.loanAmount) },
+                    { label: 'Total equity required', value: formatCurrency(summary.equityRequirement) },
+                    { label: 'This offering', value: formatCurrency(offering.target_raise) },
+                    { label: 'Total capitalisation', value: formatCurrency(summary.totalCost) },
+                    { label: 'Issuer', value: offering.issuer_entity ?? 'Not stated' },
+                    { label: 'Structure', value: offering.legal_structure ?? 'Not stated' },
+                  ]}
+                />
+                {stack ? (
+                  <div className="mt-4">
+                    <h4 className="text-[12px] font-semibold text-ink">Who gets paid back first</h4>
+                    <div className="mt-2">
+                      <CapitalStackChart sources={stack.sources} total={stack.total} />
+                    </div>
+                  </div>
+                ) : null}
+              </Disclose>
+
+              <Disclose summary="The facility itself">
+                <DefinitionList
+                  items={[
+                    { label: 'Licensed beds', value: facility?.licensed_beds?.toString() ?? '—' },
+                    { label: 'Operating beds', value: facility?.operating_beds?.toString() ?? '—' },
+                    { label: 'Occupancy', value: formatPercent(snapshot.metrics?.occupancy_pct ?? null) },
+                    { label: 'Medicaid share', value: formatPercent(snapshot.metrics?.medicaid_pct ?? null) },
+                    { label: 'Medicare share', value: formatPercent(snapshot.metrics?.medicare_pct ?? null) },
+                    { label: 'Year built', value: facility?.year_built?.toString() ?? '—' },
+                  ]}
+                />
+              </Disclose>
+
+              <Disclose summary="How it has actually performed">
+                <p className="mb-2 text-[12px] text-ink-muted">
+                  Reported results. These are actual figures from the operator&rsquo;s statements, not
+                  projections.
+                </p>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <thead>
+                      <Tr>
+                        <Th>Line item</Th>
+                        <Th numeric>{prior?.period.label ?? 'Prior'}</Th>
+                        <Th numeric>{latest?.period.label ?? 'Latest'}</Th>
+                      </Tr>
+                    </thead>
+                    <tbody>
+                      <MoneyRow label="Revenue" prior={prior?.items.revenue} latest={latest?.items.revenue} />
+                      <MoneyRow label="EBITDA" prior={prior?.items.ebitda} latest={latest?.items.ebitda} />
+                      <MoneyRow label="Labour cost" prior={prior?.items.labor_expense} latest={latest?.items.labor_expense} />
+                      <MoneyRow label="Agency labour" prior={prior?.items.agency_labor} latest={latest?.items.agency_labor} />
+                      <Tr>
+                        <Td>Underwritten NOI</Td>
+                        <Td numeric>—</Td>
+                        <Td numeric>{formatCurrency(summary.noi)}</Td>
+                      </Tr>
+                    </tbody>
+                  </Table>
+                </div>
+              </Disclose>
+
+              <Disclose summary="Who is running it">
+                <DefinitionList
+                  items={[
+                    { label: 'Entity', value: sponsor?.legal_entity ?? 'Not stated' },
+                    { label: 'Years in healthcare', value: sponsor?.years_in_healthcare?.toString() ?? '—' },
+                    { label: 'Facilities operated', value: sponsor?.facilities_operated?.toString() ?? '—' },
+                    { label: 'Beds under management', value: sponsor?.beds_operated?.toString() ?? '—' },
+                    { label: 'States', value: sponsor?.states_operated.join(', ') || '—' },
+                    { label: 'Prior acquisitions', value: sponsor?.historical_acquisitions?.toString() ?? '—' },
+                  ]}
+                />
+              </Disclose>
+
+              {analysis && analysis.analysis.missing_information.length > 0 ? (
+                <Disclose summary={`${analysis.analysis.missing_information.length} things the sponsor has not supplied`}>
+                  <ul className="space-y-1.5 text-[12px] leading-relaxed text-ink-muted">
+                    {analysis.analysis.missing_information.map((item) => <li key={item}>· {item}</li>)}
+                  </ul>
+                </Disclose>
+              ) : null}
             </CardBody>
           </Section>
 
           {/* ---- documents --------------------------------------------------- */}
-          <Section title="Documents" description="Material released to you at your current access level.">
+          <Section title="Documents" description="What has been released to you at your current access level.">
             <CardBody className="space-y-2">
               {documents.length === 0 ? (
                 <p className="text-[13px] text-ink-muted">No documents have been released at your access level.</p>
@@ -336,79 +385,42 @@ export default async function OfferingPage({
           </Section>
 
           {/* ---- questions ---------------------------------------------------- */}
-          <Section title="Questions" description="Answered by the sponsor.">
-            <CardBody className="space-y-3">
-              {questions.length === 0 ? (
-                <p className="text-[13px] text-ink-muted">No questions have been asked yet.</p>
-              ) : (
-                questions.map(({ question, answers }) => (
-                  <div key={question.id} className="border-b border-line pb-3 last:border-b-0 last:pb-0">
-                    <p className="text-[13px] text-ink">{question.body}</p>
-                    {answers.map((answer) => (
-                      <p key={answer.id} className="mt-1.5 border-l-2 border-line pl-3 text-[12px] text-ink-secondary">
-                        {answer.body}
-                      </p>
-                    ))}
-                    {answers.length === 0 ? (
-                      <p className="mt-1 text-[11px] text-ink-muted">Awaiting a response from the sponsor.</p>
-                    ) : null}
-                  </div>
-                ))
-              )}
-            </CardBody>
-          </Section>
-        </div>
-
-        {/* ---- action rail --------------------------------------------------- */}
-        <div className="space-y-4">
-          <InvestorActions
+          <AskPanel
             offeringId={offeringId}
             offeringName={offering.name}
+            suggestions={
+              analysis && analysis.analysis.questions_to_ask.length > 0
+                ? analysis.analysis.questions_to_ask.slice(0, 5)
+                : INVESTOR_SUGGESTED_QUESTIONS
+            }
+            answered={questions}
+          />
+        </div>
+
+        {/* ---- the one action panel ------------------------------------------ */}
+        <div>
+          <InvestorActions
+            offeringId={offeringId}
             minimum={offering.minimum_investment}
+            maximum={offering.maximum_investment}
             eligibility={eligibility}
             isInvestor={Boolean(actor.investor)}
             status={offering.status}
+            hasInterest={hasInterest}
+            committed={committed}
           />
-
-          <AskPanel offeringId={offeringId} suggestions={INVESTOR_SUGGESTED_QUESTIONS} />
-
-          {analysis ? (
-            <Card>
-              <CardHeader><CardTitle>What to ask</CardTitle></CardHeader>
-              <CardBody>
-                <ul className="space-y-1.5 text-[12px] leading-relaxed text-ink-secondary">
-                  {analysis.analysis.questions_to_ask.slice(0, 6).map((question) => (
-                    <li key={question}>· {question}</li>
-                  ))}
-                </ul>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          {analysis && analysis.analysis.missing_information.length > 0 ? (
-            <Card>
-              <CardHeader><CardTitle>Not yet supplied</CardTitle></CardHeader>
-              <CardBody>
-                <ul className="space-y-1.5 text-[12px] leading-relaxed text-ink-muted">
-                  {analysis.analysis.missing_information.map((item) => <li key={item}>· {item}</li>)}
-                </ul>
-              </CardBody>
-            </Card>
-          ) : null}
         </div>
       </div>
     </div>
   )
 }
 
-function HeaderStat({ label, value, tag }: { label: string; value: string; tag?: string }) {
+function HeaderStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="bg-surface px-3 py-2.5">
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] uppercase tracking-wide text-ink-muted">{label}</span>
-        {tag ? <span className="rounded bg-surface-sunken px-1 text-[9px] text-ink-muted">{tag}</span> : null}
-      </div>
-      <div className="mt-0.5 text-[15px] font-semibold tabular-nums text-ink">{value}</div>
+      <span className="text-[10px] uppercase tracking-wide text-ink-muted">{label}</span>
+      <div className="tnum mt-0.5 text-[17px] font-semibold text-ink">{value}</div>
+      {hint ? <div className="text-[11px] text-ink-muted">{hint}</div> : null}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
 import { InlineAction } from '@/components/forms/action-form'
 import { recomputeMatchesAction } from '../../actions'
 import { formatCurrency, formatRelative, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 const BAND_TONE: Record<string, Tone> = {
   strong: 'positive', good: 'accent', possible: 'warning', outside_box: 'neutral',
@@ -28,6 +29,7 @@ const BAND_TONE: Record<string, Tone> = {
  * approve anything.
  */
 export default async function MatchesPage({ params }: { params: Promise<{ dealId: string }> }) {
+  requireDebtMarketplace()
   const { dealId } = await params
   // Authorizes and produces a 404 the framework reports correctly.
   await requireDealAccess(dealId)

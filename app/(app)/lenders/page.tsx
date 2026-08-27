@@ -4,6 +4,7 @@ import { requireActor } from '@/lib/auth/session'
 import { allLenders, publicProfile } from '@/services/lenders'
 import { Badge, Card, CardBody, EmptyState, PageHeader } from '@/components/ui/primitives'
 import { formatCurrency, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Lender directory' }
 
@@ -15,6 +16,7 @@ export const metadata: Metadata = { title: 'Lender directory' }
  * no more than a borrower does.
  */
 export default async function LenderDirectoryPage() {
+  requireDebtMarketplace()
   await requireActor()
   const lenders = (await allLenders()).filter(({ lender }) => lender.verification_status === 'verified')
 

@@ -116,6 +116,17 @@ export const ADMIN_NAV_WITH_DEBT: NavGroup[] = [
 
 export const SETTINGS_ITEM: NavItem = { href: '/settings', label: 'Settings', icon: Settings }
 
+/** What an account with no workspace of its own on this deployment is offered. */
+export const LOOKER_NAV: NavGroup[] = [
+  {
+    label: '',
+    items: [
+      { href: '/investments', label: 'Browse investments', icon: Store, prefix: true },
+      { href: '/notifications', label: 'Updates', icon: Activity },
+    ],
+  },
+]
+
 /**
  * The investor's navigation.
  *
@@ -146,7 +157,11 @@ export type NavRole = 'borrower' | 'lender' | 'investor' | 'admin'
  */
 export function navForRole(role: NavRole, debtMarketplace = false): NavGroup[] {
   if (role === 'admin') return debtMarketplace ? ADMIN_NAV_WITH_DEBT : ADMIN_NAV
-  if (role === 'lender') return LENDER_NAV
+  // A lender account on an investment-only deployment has no lender workspace
+  // to be offered. It is not locked out — it can read the marketplace like any
+  // other signed-in account — but the chrome must not point at pages that are
+  // no longer there.
+  if (role === 'lender') return debtMarketplace ? LENDER_NAV : LOOKER_NAV
   if (role === 'investor') return INVESTOR_NAV
   return debtMarketplace ? BORROWER_NAV : SPONSOR_NAV
 }

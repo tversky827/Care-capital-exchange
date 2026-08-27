@@ -32,10 +32,11 @@ export interface AuthState {
  * they do not own and none of the offerings they came to look at.
  */
 function landingFor(actor: Actor): string {
+  const debt = debtMarketplaceEnabled()
   if (actor.isAdmin) return '/admin'
-  if (actor.isLender) return '/lender'
+  if (actor.isLender) return debt ? '/lender' : '/investments'
   if (actor.isInvestor) return '/investments'
-  return debtMarketplaceEnabled() ? '/dashboard' : '/deals'
+  return debt ? '/dashboard' : '/deals'
 }
 
 export async function loginAction(_prev: AuthState, formData: FormData): Promise<AuthState> {

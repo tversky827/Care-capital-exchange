@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/primitives'
 import { SelectIndication } from './select-indication'
 import { formatCurrency, formatDate, formatPercent, formatRatio, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 /**
  * Offer comparison.
@@ -20,6 +21,7 @@ import { formatCurrency, formatDate, formatPercent, formatRatio, titleize } from
  * a low coupon with heavy fees does not read as cheaper than it is.
  */
 export default async function IndicationsPage({ params }: { params: Promise<{ dealId: string }> }) {
+  requireDebtMarketplace()
   const { dealId } = await params
   // Authorizes and produces a 404 the framework reports correctly.
   await requireDealAccess(dealId)

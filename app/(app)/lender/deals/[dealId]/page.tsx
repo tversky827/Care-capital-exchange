@@ -23,6 +23,7 @@ import { MetricTile, SeverityBadge } from '@/components/deal/common'
 import { IndicationForm } from './indication-form'
 import { LenderNotes, PipelineControl, RequestInformation } from './lender-tools'
 import { formatCurrency, formatDate, formatPercent, formatRatio, formatRelative, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 /**
  * Lender deal room.
@@ -33,6 +34,7 @@ import { formatCurrency, formatDate, formatPercent, formatRatio, formatRelative,
  * ability to submit an indication.
  */
 export default async function LenderDealPage({ params }: { params: Promise<{ dealId: string }> }) {
+  requireDebtMarketplace()
   const { dealId } = await params
   const actor = await requireActor()
   if (!actor.isLender && !actor.isAdmin) redirect(`/deals/${dealId}`)

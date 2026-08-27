@@ -116,7 +116,9 @@ async function main(): Promise<void> {
     { path: '/', expect: 'Healthcare capital' },
     { path: '/how-it-works', expect: 'How it works' },
     { path: '/for-borrowers', expect: 'fifteen banks' },
-    { path: '/for-lenders', expect: 'lending box' },
+    // The lender-facing page is part of the debt marketplace, which this
+    // deployment does not run.
+    { path: '/for-lenders', allow: [404] },
     { path: '/pricing', expect: 'Transaction fees' },
     { path: '/about', expect: 'Principles' },
     { path: '/contact', expect: 'Contact' },
@@ -128,8 +130,10 @@ async function main(): Promise<void> {
   console.log('Borrower routes')
   const borrower = await cookieFor('dana@meridiansenior.demo')
   failures += await run('borrower', borrower, [
-    { path: '/dashboard', expect: 'Portfolio overview' },
-    { path: '/deals', expect: 'Deals' },
+    // The portfolio dashboard is a debt-marketplace view; a sponsor is sent to
+    // their raises instead.
+    { path: '/dashboard', allow: [307, 302, 200] },
+    { path: '/deals', expect: 'My raises' },
     { path: '/deals/new', expect: 'Create a deal' },
     { path: `/deals/${dealId}`, expect: 'Underwriting metrics' },
     { path: `/deals/${dealId}/financials`, expect: 'Financial' },
@@ -139,21 +143,14 @@ async function main(): Promise<void> {
     { path: `/deals/${dealId}/documents`, expect: 'Data room' },
     { path: `/deals/${dealId}/issues`, expect: 'attention' },
     { path: `/deals/${dealId}/analysis`, expect: 'analysis' },
-    { path: `/deals/${dealId}/memo`, expect: 'memo' },
-    { path: `/deals/${dealId}/matches`, expect: 'match' },
-    { path: `/deals/${dealId}/indications`, expect: 'ndication' },
     { path: `/deals/${dealId}/messages`, expect: 'essage' },
     { path: `/deals/${dealId}/activity`, expect: 'ctivity' },
-    { path: `/deals/${dealId}/distribute`, expect: 'istribut' },
     { path: `/deals/${dealId}/ask`, expect: 'Ask' },
     { path: `/deals/${dealId}/capital`, expect: 'apitalisation' },
     { path: `/deals/${dealId}/equity`, expect: 'quity' },
     { path: `/deals/${dealId}/equity/new`, expect: 'Create an equity offering' },
-    { path: '/capital', expect: 'Debt and equity across your deals' },
-    { path: '/analytics', expect: 'Analytics' },
     { path: '/notifications', expect: 'Notifications' },
     { path: '/settings', expect: 'Settings' },
-    { path: `/lenders/${lenderId}`, expect: 'lending' },
     { path: '/api/search?q=lake', expect: 'results' },
     // A deal belonging to another borrower must render the not-found page and
     // must not disclose anything about the deal. Next.js reports an in-app
@@ -166,20 +163,33 @@ async function main(): Promise<void> {
   ])
 
   if (lenderEmail) {
-    console.log('Lender routes')
+    // Every debt-marketplace surface must be gone from an investment-only
+    // deployment. Next.js reports an in-app notFound() as a 200 once the shell
+    // has streamed, so each assertion is that the page's own content is absent
+    // and the not-found page is what rendered.
+    console.log('Debt marketplace is switched off')
     const lender = await cookieFor(lenderEmail)
-    failures += await run('lender', lender, [
-      { path: '/lender', expect: 'ipeline' },
-      { path: '/marketplace', expect: 'arketplace' },
-      { path: '/lender/pipeline', expect: 'ipeline' },
-      { path: '/lender/box', expect: 'ending box' },
-      { path: '/lender/profile', expect: 'rofile' },
-      { path: '/lender/analytics', expect: 'nalytics' },
-      { path: `/lender/deals/${dealId}`, expect: 'ndication' },
+    const gone = (path: string, ownContent: string): Check =>
+      ({ path, allow: [200, 404], expect: 'Not found', absent: ownContent })
+    failures += await run('debt marketplace off', lender, [
+      gone('/lender', 'Lending box'),
+      gone('/marketplace', 'Screen the marketplace'),
+      gone('/lender/pipeline', 'Pipeline value'),
+      gone('/lender/box', 'Asset types you lend against'),
+      gone('/lender/profile', 'Published profile'),
+      gone('/lender/analytics', 'Win rate'),
+      gone(`/lender/deals/${dealId}`, 'Submit an indication'),
       { path: '/notifications', expect: 'Notifications' },
-      // A lender must never reach the borrower workspace; they are routed to
-      // the lender deal room instead.
-      { path: `/deals/${dealId}`, allow: [307, 302, 200], absent: 'Ask the deal' },
+    ])
+    const sponsor = await cookieFor('dana@meridiansenior.demo')
+    failures += await run('debt marketplace off, sponsor', sponsor, [
+      gone('/lenders', 'Verified institutions'),
+      gone(`/lenders/${lenderId}`, 'Lending box'),
+      gone('/capital', 'Debt and equity across your deals'),
+      gone('/analytics', 'Weighted average'),
+      gone(`/deals/${dealId}/matches`, 'Ranked by fit'),
+      gone(`/deals/${dealId}/indications`, 'Compare indications'),
+      gone(`/deals/${dealId}/distribute`, 'Send this deal'),
     ])
   }
 
@@ -195,7 +205,7 @@ async function main(): Promise<void> {
     const investor = await cookieFor(investorUser.email)
     failures += await run('investor', investor, [
       { path: '/investor/dashboard', expect: 'Portfolio overview' },
-      { path: '/investments', expect: 'Healthcare investment marketplace' },
+      { path: '/investments', expect: 'Invest in healthcare properties' },
       { path: '/investor/opportunities', expect: 'Opportunities for you' },
       { path: '/investor/portfolio', expect: 'Portfolio' },
       { path: '/investor/documents', expect: 'Documents' },
@@ -203,7 +213,7 @@ async function main(): Promise<void> {
       { path: '/notifications', expect: 'Notifications' },
       ...(liveOffering
         ? [
-          { path: `/investments/${liveOffering.id}`, expect: 'Target raise' },
+          { path: `/investments/${liveOffering.id}`, expect: 'What it could pay' },
           { path: `/investments/compare?ids=${liveOffering.id}`, expect: 'Choose offerings to compare' },
         ]
         : []),
@@ -214,7 +224,6 @@ async function main(): Promise<void> {
   failures += await run('admin', admin, [
     { path: '/admin', expect: 'arketplace' },
     { path: '/admin/deals', expect: 'eals' },
-    { path: '/admin/lenders', expect: 'erification' },
     { path: '/admin/users', expect: 'sers' },
     { path: '/admin/ai', expect: 'AI' },
     { path: '/admin/jobs', expect: 'obs' },

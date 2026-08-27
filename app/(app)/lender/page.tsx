@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/primitives'
 import { MetricTile, NextAction } from '@/components/deal/common'
 import { formatCurrency, formatPercent, formatRatio, formatRelative, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Lender dashboard' }
 
@@ -25,6 +26,7 @@ export const metadata: Metadata = { title: 'Lender dashboard' }
  * distributions — there is no route from this page to a deal they were not sent.
  */
 export default async function LenderDashboard() {
+  requireDebtMarketplace()
   const actor = await requireActor()
   if (!actor.isLender) redirect(actor.isAdmin ? '/admin' : '/dashboard')
 

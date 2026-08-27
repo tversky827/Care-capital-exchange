@@ -12,6 +12,7 @@ import { DistributePanel } from './distribute-panel'
 import { InlineAction } from '@/components/forms/action-form'
 import { revokeDistributionAction } from '../../actions'
 import { formatRelative, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 /**
  * Distribution.
@@ -22,6 +23,7 @@ import { formatRelative, titleize } from '@/lib/utils/format'
  * only to an administrator and is recorded as an override.
  */
 export default async function DistributePage({ params }: { params: Promise<{ dealId: string }> }) {
+  requireDebtMarketplace()
   const { dealId } = await params
   // Authorizes and produces a 404 the framework reports correctly.
   await requireDealAccess(dealId)

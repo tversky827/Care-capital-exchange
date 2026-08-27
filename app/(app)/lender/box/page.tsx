@@ -5,6 +5,7 @@ import { requireActor } from '@/lib/auth/session'
 import { Alert, Card, CardBody, Section } from '@/components/ui/primitives'
 import { LendingBoxForm } from './form'
 import { ASSET_TYPES, TRANSACTION_TYPES } from '@/types'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const metadata: Metadata = { title: 'Lending box' }
 
@@ -18,6 +19,7 @@ export default async function LendingBoxPage({
 }: {
   searchParams: Promise<{ welcome?: string }>
 }) {
+  requireDebtMarketplace()
   const actor = await requireActor()
   if (!actor.isLender) redirect(actor.isAdmin ? '/admin' : '/dashboard')
   const lender = actor.lender

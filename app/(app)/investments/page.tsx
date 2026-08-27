@@ -3,7 +3,7 @@ import { isAvailable } from '@/lib/flags'
 import { OfferingCard } from '@/components/equity/offering-card'
 import { Alert, EmptyState, PageHeader } from '@/components/ui/primitives'
 import { searchOfferings, type OfferingSearch } from '@/services/equity/matching'
-import { CompareBar, MarketplaceFilters, SaveButton } from './filters'
+import { MarketplaceFilters, SaveButton } from './filters'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,27 +67,25 @@ export default async function InvestmentsPage({
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Opportunities"
-        title="Healthcare investment marketplace"
-        description="Private healthcare investments. Every figure shown is drawn from the sponsor's own submission and is labelled as historical, projected or targeted."
+        title="Invest in healthcare properties"
+        description="Nursing homes, assisted living and behavioural health facilities, offered by the operators who run them. Every figure comes from the operator's own submission."
       />
 
       <Alert tone="neutral">
-        CareCapital Exchange is not a broker-dealer, investment adviser or funding portal, and
-        nothing here is a recommendation to invest. Private investments are illiquid and can lose
-        their entire value.
+        These are private investments. Your money is committed for years, you cannot sell your
+        stake, and you can lose all of it. CareCapital Exchange is not a broker-dealer, investment
+        adviser or funding portal, and nothing here is a recommendation to invest.
       </Alert>
 
       <MarketplaceFilters total={unfiltered.length} showing={sorted.length} />
 
       {sorted.length === 0 ? (
         <EmptyState
-          title="No offerings match"
-          description="No published offering matches these filters. Clearing them shows everything currently open."
+          title="Nothing matches those filters"
+          description="Clearing them shows everything currently open to investors."
         />
       ) : (
         <>
-          {sorted.length > 1 ? <CompareBar ids={sorted.map((row) => row.offering.id)} /> : null}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {sorted.map((row) => (
               <div key={row.offering.id} className="space-y-1.5">

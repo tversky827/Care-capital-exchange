@@ -12,6 +12,7 @@ import { capitalRequirement } from '@/services/equity/capital-stack'
 import { matchCountsForOffering } from '@/services/equity/matching'
 import type { Deal, Facility } from '@/types'
 import type { Offering } from '@/types/equity'
+import { requireDebtMarketplace } from '@/lib/product'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +33,7 @@ interface Row {
  * operator raising on three deals had no way to see the three together.
  */
 export default async function CapitalPage() {
+  requireDebtMarketplace()
   const actor = await requireActor()
   if (actor.isInvestor) redirect('/investor/dashboard')
   if (actor.isLender) redirect('/lender')

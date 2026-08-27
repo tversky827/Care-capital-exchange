@@ -3,6 +3,7 @@ import { requireActor } from '@/lib/auth/session'
 import { lenderById, publicProfile } from '@/services/lenders'
 import { Alert, Badge, Card, CardBody, DefinitionList, PageHeader, Section } from '@/components/ui/primitives'
 import { formatCurrency, titleize } from '@/lib/utils/format'
+import { requireDebtMarketplace } from '@/lib/product'
 
 /**
  * Public lender profile.
@@ -12,6 +13,7 @@ import { formatCurrency, titleize } from '@/lib/utils/format'
  * template.
  */
 export default async function LenderProfilePage({ params }: { params: Promise<{ lenderId: string }> }) {
+  requireDebtMarketplace()
   const { lenderId } = await params
   await requireActor()
 

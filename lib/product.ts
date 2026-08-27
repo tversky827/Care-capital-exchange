@@ -9,10 +9,10 @@ import { isEnabled } from '@/lib/flags'
  * in `lib/policy.ts`: policy decides whether *this actor* may see a thing that
  * exists, and this decides whether the thing exists at all.
  *
- * Guarding is per route rather than in one piece of middleware on purpose. A
+ * Guarding is done by each page rather than by one piece of middleware. A
  * central matcher drifts from the routes it claims to cover — a new debt page
- * is simply missed — whereas a page that asks for its own capability cannot be
- * added without the question being answered.
+ * is simply missed, and the miss is silent — whereas a page that asks for its
+ * own capability cannot be added without the question being answered.
  */
 
 /** Whether the debt marketplace's own surfaces are part of this product. */
