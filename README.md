@@ -246,6 +246,9 @@ AUTH_SECRET=<openssl rand -hex 32>
 | `supabase/migrations/0002_rls.sql` | Row level security on every table, plus the private storage bucket |
 | `supabase/migrations/0003_equity.sql` | The equity marketplace: 29 tables, the investor role, `updated_at` triggers |
 | `supabase/migrations/0004_equity_rls.sql` | Row level security for the equity tables, mirroring `lib/policy.ts` |
+| `supabase/migrations/0005_nda.sql` | Confidentiality agreements and their acceptances |
+| `supabase/migrations/0006_accounts.sql` | Investment accounts, the cash ledger, orders — with the ledger's immutability triggers |
+| `supabase/migrations/0007_accounts_rls.sql` | Row level security for the accounts tables. No account holder may write a ledger entry or an order |
 
 Apply in order:
 
@@ -498,10 +501,15 @@ create a project and wait for it to finish provisioning.
 
 **2. Apply the schema.** In the Supabase dashboard open **SQL Editor**, paste
 each migration in `supabase/migrations/` in order — `0001_init.sql`,
-`0002_rls.sql`, `0003_equity.sql`, `0004_equity_rls.sql` — running each before
-pasting the next. `0002` also creates the private `deal-documents` storage
-bucket. All four have been applied to a stock PostgreSQL 16 and produce 71
-tables, 145 row-level-security policies and 40 `updated_at` triggers.
+`0002_rls.sql`, `0003_equity.sql`, `0004_equity_rls.sql`, `0005_nda.sql`,
+`0006_accounts.sql`, `0007_accounts_rls.sql` — running each before pasting the
+next. Order matters: each row-level-security file depends on helper functions
+the file before it defines. `0002` also creates the private `deal-documents`
+storage bucket.
+
+All seven have been applied in order to a stock PostgreSQL 16 and produce 80
+tables, 164 row-level-security policies and 47 `updated_at` triggers, with no
+table left without row-level security.
 
 **3. Collect four values** from **Project Settings → API**: the project URL,
 the `anon` key and the `service_role` key. Generate the fourth yourself:
