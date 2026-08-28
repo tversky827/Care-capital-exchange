@@ -460,7 +460,7 @@ const OFFERINGS: OfferingFixture[] = [
     issuer: 'Auburn Lantern Ridge LLC',
     structure: 'Oklahoma LLC, manager-managed',
     summary: 'Common equity in the acquisition of a two-star, 118-bed facility in Tulsa, Oklahoma, at a price below appraised value. A $1.4M capital programme and a staffing plan are budgeted from day one.',
-    targetRaise: 3_800_000, minimum: 50_000, maximum: null,
+    targetRaise: 1_600_000, minimum: 50_000, maximum: null,
     holdYears: 7, preferredReturnPct: 0.08, targetIrrPct: 21.5, targetMultiple: 2.4,
     promotePct: 0.25, exitCapRatePct: null, exitMultiple: 6.5,
     revenueGrowthPct: 5, expenseGrowthPct: 4.2, sellingCostsPct: 2.5,
@@ -590,18 +590,41 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
     const purchasePrice = snapshot?.terms?.purchase_price ?? null
     const noi = snapshot?.summary.noi ?? null
     const ebitda = snapshot?.latest?.items.ebitda ?? null
+    // What the asset is worth going in: the price where one was paid, the
+    // appraisal where this is a refinance. Guarding on the purchase price
+    // alone meant every refinance skipped the guard entirely and kept the
+    // fixture's exit assumption — which is how a raise came to advertise a
+    // 354% annual return.
+    const basis = snapshot?.summary.valueBasis ?? null
 
     let exitCapRatePct = fixture.exitCapRatePct
     let exitMultiple = fixture.exitMultiple
-    if (exitCapRatePct !== null && noi !== null && purchasePrice !== null && purchasePrice > 0) {
-      const goingInCapPct = (noi / purchasePrice) * 100
+    if (exitCapRatePct !== null && noi !== null && basis !== null && basis > 0) {
+      const goingInCapPct = (noi / basis) * 100
       // Exit slightly softer than entry: the conservative direction.
       exitCapRatePct = round(Math.max(exitCapRatePct, goingInCapPct + 0.25), 2)
     }
-    if (exitMultiple !== null && ebitda !== null && purchasePrice !== null && ebitda > 0) {
-      const goingInMultiple = purchasePrice / ebitda
-      exitMultiple = round(Math.min(exitMultiple, goingInMultiple - 0.25), 2)
+    if (exitMultiple !== null && ebitda !== null && basis !== null && ebitda > 0) {
+      const goingInMultiple = basis / ebitda
+      // The same rule said the other way round. Never exit at a richer
+      // multiple than entry — and never assume the market re-rates the asset
+      // down by more than a quarter-turn either, because a 7x exit on an asset
+      // bought at 13x is not a conservative assumption, it is a guaranteed
+      // loss dressed as one. Held flat, the return has to come from operations
+      // and from paying the debt down, which is the only story a demo of this
+      // sector can honestly tell.
+      exitMultiple = round(
+        Math.max(Math.min(exitMultiple, goingInMultiple), goingInMultiple - 0.25),
+        2,
+      )
     }
+
+    // The equity the deal actually carries, which is what an investor's stake
+    // is a share of. `equityRequirement` is cash to close: legitimately zero on
+    // a cash-out refinance, where it would make the raise 100% of nothing.
+    const dealEquity = basis !== null && snapshot?.summary.loanAmount !== null
+      ? Math.max(basis - (snapshot?.summary.loanAmount ?? 0), fixture.targetRaise)
+      : fixture.targetRaise
 
     const accepted = fixture.commitments.filter((c) => c.accepted)
     const committed = round(accepted.reduce((sum, c) => sum + c.amount, 0), 2)
@@ -670,7 +693,7 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
         amortizationMonths: snapshot.assumedTerms.amortizationMonths,
         interestOnlyMonths: snapshot.terms?.requested_io_months ?? 0,
         investorEquity: fixture.targetRaise,
-        totalEquity: snapshot.summary.equityRequirement ?? fixture.targetRaise,
+        totalEquity: dealEquity,
         purchasePrice,
         holdYears: fixture.holdYears,
         revenueGrowthPct: fixture.revenueGrowthPct,
