@@ -6,6 +6,8 @@ import { TopBar } from '@/components/shell/topbar'
 import { MobileNav, Sidebar } from '@/components/shell/sidebar'
 import type { NavRole } from '@/components/shell/nav-config'
 import { DemoBanner } from '@/components/brand'
+import { EnvironmentBanner } from '@/components/shell/environment-banner'
+import { currentEnvironment } from '@/lib/environment'
 
 /**
  * Authenticated shell.
@@ -27,17 +29,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const store = await db()
   const demoDeals = await store.count('deals', { where: { is_demo: true } })
 
+  // Resolved from the signed cookie, not from anything the page was asked for.
+  const environment = await currentEnvironment(actor.user.id)
+
   return (
     <div className="flex min-h-screen bg-canvas">
-      <Sidebar role={role} debtMarketplace={debtMarketplace} />
+      <Sidebar role={role} debtMarketplace={debtMarketplace} sandbox={environment !== 'live'} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar actor={actor} />
-        {demoDeals > 0 ? <DemoBanner className="no-print" /> : null}
+        <EnvironmentBanner environment={environment} />
+        {/* The seeded-data notice is redundant once the sandbox names itself. */}
+        {demoDeals > 0 && environment === 'live' ? <DemoBanner className="no-print" /> : null}
         <main className="min-w-0 flex-1 px-4 py-5 lg:px-6 lg:py-6">{children}</main>
         {/* Last in the flow: on a phone this is a bar fixed to the bottom of
             the viewport, and the spacer it renders has to follow the content
             it is keeping clear. */}
-        <MobileNav role={role} debtMarketplace={debtMarketplace} />
+        <MobileNav role={role} debtMarketplace={debtMarketplace} sandbox={environment !== 'live'} />
       </div>
     </div>
   )

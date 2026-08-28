@@ -229,6 +229,14 @@ async function main(): Promise<void> {
       { path: '/investor/cash', expect: 'Every movement' },
       { path: '/investor/activity', expect: 'Activity' },
       { path: '/investor/distributions', expect: 'Paid to you, all time' },
+      // The sandbox entry screen is reachable from the live product; the
+      // environments behind it need a signed cookie the smoke run has no way
+      // to mint, so they are covered by the browser run instead.
+      { path: '/sandbox', expect: 'Explore healthcare investing with nothing at stake' },
+      // Without the signed environment cookie there is no sandbox to be in.
+      // Next reports an in-app redirect as a 200 once the shell has streamed,
+      // so the assertion is that the sandbox's own content is absent.
+      { path: '/sandbox/home', allow: [200, 307, 302], absent: 'Virtual cash' },
       { path: '/investor/dashboard', expect: 'Portfolio overview' },
       { path: '/investments', expect: 'Invest in healthcare properties' },
       { path: '/investor/opportunities', expect: 'Opportunities for you' },

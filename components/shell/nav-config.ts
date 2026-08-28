@@ -2,8 +2,9 @@
 
 import type { LucideIcon } from 'lucide-react'
 import {
-  Activity, BarChart3, Briefcase, Building2, Coins, FileText, Gauge, Home, LayoutDashboard,
-  ListChecks, Receipt, Search, Settings, ShieldCheck, Store, Users, Wallet, Workflow,
+  Activity, BarChart3, Briefcase, Building2, Coins, FileText, FlaskConical, Gauge, Home,
+  LayoutDashboard, ListChecks, Receipt, Search, Settings, ShieldCheck, Store, Users, Wallet,
+  Workflow,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -153,6 +154,34 @@ export const INVESTOR_NAV: NavGroup[] = [
     items: [
       { href: '/investor/distributions', label: 'Distributions', icon: Coins, prefix: true },
       { href: '/notifications', label: 'Updates', icon: Activity },
+      { href: '/sandbox', label: 'Demo & practice', icon: FlaskConical, prefix: true, short: 'Sandbox' },
+    ],
+  },
+]
+
+/**
+ * Navigation inside the sandbox.
+ *
+ * The same five destinations as the live investor, pointing at the sandbox's
+ * own home, cash and portfolio. The marketplace entry is shared, because the
+ * marketplace itself is: practice mode reads the live catalogue, and giving it
+ * a separate browse page would be a second implementation of the one screen
+ * this whole exercise is meant to teach.
+ */
+export const SANDBOX_NAV: NavGroup[] = [
+  {
+    label: '',
+    items: [
+      { href: '/sandbox/home', label: 'Home', icon: Home },
+      { href: '/investments', label: 'Browse investments', icon: Store, prefix: true, short: 'Browse' },
+      { href: '/sandbox/portfolio', label: 'Practice portfolio', icon: Briefcase, prefix: true, short: 'Portfolio' },
+      { href: '/sandbox/cash', label: 'Virtual cash', icon: Wallet, prefix: true, short: 'Cash' },
+    ],
+  },
+  {
+    label: '',
+    items: [
+      { href: '/sandbox', label: 'Switch mode', icon: FlaskConical },
     ],
   },
 ]
@@ -167,7 +196,15 @@ export type NavRole = 'borrower' | 'lender' | 'investor' | 'admin'
  * the debt marketplace — because a feature flag's environment override is not
  * readable from the browser.
  */
-export function navForRole(role: NavRole, debtMarketplace = false): NavGroup[] {
+export function navForRole(
+  role: NavRole,
+  debtMarketplace = false,
+  sandbox = false,
+): NavGroup[] {
+  // Inside the sandbox the chrome is the sandbox's, whatever the account's
+  // role. A presenter switching perspectives should not find the navigation
+  // pointing back at live surfaces.
+  if (sandbox) return SANDBOX_NAV
   if (role === 'admin') return debtMarketplace ? ADMIN_NAV_WITH_DEBT : ADMIN_NAV
   // A lender account on an investment-only deployment has no lender workspace
   // to be offered. It is not locked out — it can read the marketplace like any

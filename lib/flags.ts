@@ -84,6 +84,38 @@ export const FLAGS = {
   REAL_SECURITIES_ENABLED: false,
   /** Positions may be transferred between investors. Not built. */
   SECONDARY_MARKET_ENABLED: false,
+
+  // --- the sandbox ----------------------------------------------------------
+  /**
+   * The sandbox as a whole: the entry screen, the environment switch and the
+   * banner that says which environment a person is in.
+   */
+  SANDBOX_ENABLED: true,
+  /** A fictional catalogue, for showing the product to someone. */
+  DEMO_MODE_ENABLED: true,
+  /** Virtual money against the real catalogue. */
+  PRACTICE_MODE_ENABLED: true,
+  /**
+   * Practice reads the live catalogue rather than a copy of it.
+   *
+   * Off means practice sees only the demonstration catalogue. It exists for a
+   * deployment whose live offerings are genuinely private and should not be
+   * readable by anyone who has not been through eligibility — practice reads
+   * at the access level of the person reading, but a deployment may want the
+   * whole surface closed regardless.
+   */
+  PRACTICE_REAL_DEALS_ENABLED: true,
+  /** Virtual cash may be added to a sandbox account. */
+  PRACTICE_VIRTUAL_MONEY_ENABLED: true,
+  /**
+   * Orders may be placed in the live environment.
+   *
+   * Distinct from REAL_MONEY_ENABLED below. This one asks whether the live
+   * investment workflow is open at all; that one asks whether money moves
+   * through it. A deployment showing the product to prospects wants the
+   * sandbox open and the live workflow closed.
+   */
+  PRODUCTION_INVESTING_ENABLED: true,
 } as const
 
 export type FeatureFlag = keyof typeof FLAGS
@@ -118,6 +150,10 @@ const REQUIRES: Partial<Record<FeatureFlag, FeatureFlag[]>> = {
     'EQUITY_MARKETPLACE_ENABLED',
   ],
   AUTO_INVEST_ENABLED: ['INVESTMENT_ORDERS_ENABLED'],
+  DEMO_MODE_ENABLED: ['SANDBOX_ENABLED'],
+  PRACTICE_MODE_ENABLED: ['SANDBOX_ENABLED'],
+  PRACTICE_REAL_DEALS_ENABLED: ['SANDBOX_ENABLED', 'PRACTICE_MODE_ENABLED'],
+  PRACTICE_VIRTUAL_MONEY_ENABLED: ['SANDBOX_ENABLED', 'PRACTICE_MODE_ENABLED'],
   TAX_CENTER_ENABLED: ['INVESTOR_PLATFORM_ENABLED'],
   REAL_MONEY_ENABLED: ['CASH_ACCOUNT_ENABLED'],
   REAL_SECURITIES_ENABLED: ['INVESTMENT_ORDERS_ENABLED'],

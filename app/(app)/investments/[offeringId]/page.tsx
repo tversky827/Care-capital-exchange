@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/primitives'
 import { CapitalStackChart } from '@/components/equity/capital-stack-chart'
 import { InvestmentTicket } from './ticket'
+import { PracticeTicket } from './practice-ticket'
 import { NdaGate } from './nda-gate'
 import { AskPanel } from './ask-panel'
 import { BearCase } from './bear-case'
@@ -24,6 +25,10 @@ import { questionsFor } from '@/services/equity/portfolio'
 import { ndaState } from '@/services/equity/nda'
 import { accountFor } from '@/services/accounts/accounts'
 import { spendableFor } from '@/services/accounts/ledger'
+import { currentEnvironment } from '@/lib/environment'
+import { accountFor as sandboxAccountFor } from '@/services/practice/accounts'
+import { balanceFor as sandboxBalanceFor } from '@/services/practice/ledger'
+import { positionIn } from '@/services/practice/investing'
 import { CURRENT_NDA } from '@/lib/equity/nda'
 import type { EligibilityResult } from '@/lib/equity/eligibility'
 
@@ -79,6 +84,12 @@ export default async function OfferingPage({
     ])
     : [null, null, [], [], []]
 
+  // Which environment this reader is in decides which ticket they get, and it
+  // is resolved from the signed cookie rather than from anything on the page.
+  // Everything above this line — the record, the analysis, the documents, the
+  // access ladder — is identical in all three, which is the point.
+  const environment = await currentEnvironment(actor.user.id)
+
   // What the ticket needs: whether they may invest, how much cash is actually
   // spendable right now, what they already hold here, and what they will be
   // asked to acknowledge. All of it is loaded server-side; the ticket computes
@@ -89,7 +100,21 @@ export default async function OfferingPage({
   let hasAccount = false
   let hasInterest = false
   let disclosures: { id: string; title: string }[] = []
-  if (actor.investor && nda.accepted) {
+  let sandboxCents = 0
+  let sandboxHeldCents: number | null = null
+  if (environment !== 'live' && nda.accepted) {
+    const sandbox = await sandboxAccountFor(actor, environment)
+    if (sandbox) {
+      const [balance, held] = await Promise.all([
+        sandboxBalanceFor(sandbox.id),
+        positionIn(sandbox.id, offeringId),
+      ])
+      sandboxCents = balance
+      sandboxHeldCents = held?.invested_cents ?? null
+    }
+  }
+
+  if (actor.investor && nda.accepted && environment === 'live') {
     const investorId = actor.investor.id
     const [result, commitments, account, required, interest] = await Promise.all([
       evaluateEligibility(actor, offeringId).catch(() => null),
@@ -437,6 +462,19 @@ export default async function OfferingPage({
 
         {/* ---- the one action panel ------------------------------------------ */}
         <div>
+          {environment !== 'live' ? (
+            <PracticeTicket
+              offeringId={offeringId}
+              offeringName={offeringTitle(offering, deal, facility, revealIdentity)}
+              minimum={offering.minimum_investment}
+              maximum={offering.maximum_investment}
+              availableCents={sandboxCents}
+              status={offering.status}
+              heldCents={sandboxHeldCents}
+              holdYears={terms?.target_hold_months ? Math.round(terms.target_hold_months / 12) : null}
+              structure={terms?.capital_position === 'preferred_equity' ? 'Preferred equity' : 'Common equity'}
+            />
+          ) : (
           <InvestmentTicket
             offeringId={offeringId}
             offeringName={offeringTitle(offering, deal, facility, revealIdentity)}
@@ -458,6 +496,7 @@ export default async function OfferingPage({
             structure={terms?.capital_position === 'preferred_equity' ? 'Preferred equity' : 'Common equity'}
             hasInterest={hasInterest}
           />
+          )}
         </div>
       </div>
       )}

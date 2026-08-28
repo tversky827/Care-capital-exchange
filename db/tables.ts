@@ -24,6 +24,10 @@ import type {
   CashAccount, CashLedgerEntry, CashTransfer, FundingSource, InvestmentOrder, InvestorAccount,
   ProviderAccount, ProviderTransaction,
 } from '@/types/accounts'
+import type {
+  PracticeAccount, PracticeActivity, PracticeLedgerEntry, PracticePosition, PracticeReset,
+  PracticeScenario, PracticeWatchlistEntry,
+} from '@/types/practice'
 
 export interface Tables {
   users: User
@@ -108,7 +112,26 @@ export interface Tables {
   investor_matches: InvestorMatch
   saved_investments: SavedInvestment
   compliance_reviews: ComplianceReview
+
+  // --- the sandbox ----------------------------------------------------------
+  // Separate from everything above on purpose. Nothing here references the
+  // production money path, and no production service reads any of it.
+  practice_accounts: PracticeAccount
+  practice_ledger_entries: PracticeLedgerEntry
+  practice_positions: PracticePosition
+  practice_activity: PracticeActivity
+  practice_watchlist: PracticeWatchlistEntry
+  practice_scenarios: PracticeScenario
+  practice_resets: PracticeReset
 }
+
+/** The sandbox tables. The only tables a sandbox service may ever write. */
+export const PRACTICE_TABLES = [
+  'practice_accounts', 'practice_ledger_entries', 'practice_positions', 'practice_activity',
+  'practice_watchlist', 'practice_scenarios', 'practice_resets',
+] as const
+
+export type PracticeTableName = (typeof PRACTICE_TABLES)[number]
 
 export type TableName = keyof Tables
 
@@ -132,6 +155,8 @@ export const TABLE_NAMES: TableName[] = [
   'investor_matches', 'saved_investments', 'compliance_reviews', 'nda_acceptances',
   'investor_accounts', 'cash_accounts', 'cash_ledger_entries', 'cash_transfers',
   'funding_sources', 'investment_orders', 'provider_accounts', 'provider_transactions',
+  'practice_accounts', 'practice_ledger_entries', 'practice_positions', 'practice_activity',
+  'practice_watchlist', 'practice_scenarios', 'practice_resets',
 ]
 
 /** Tables that must never be updated or deleted through the ordinary data API. */
@@ -158,4 +183,11 @@ export const APPEND_ONLY_TABLES: TableName[] = [
   // exposes no way to change anything but status, and migration 0006 installs
   // a trigger that rejects an UPDATE touching any other column — which holds
   // even against something writing SQL directly.
+
+  // The sandbox ledger, on the other hand, genuinely is append-only. Virtual
+  // money has no bank behind it, so an entry has no status to advance through:
+  // it is posted the moment it exists. A correction is a reversing entry here
+  // too, and clearing a portfolio writes a `practice_resets` row rather than
+  // deleting the history it cleared.
+  'practice_ledger_entries', 'practice_activity', 'practice_resets',
 ]

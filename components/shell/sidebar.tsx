@@ -9,14 +9,16 @@ import { cn } from '@/lib/utils/cn'
 import { navForRole, SETTINGS_ITEM, type NavRole } from './nav-config'
 
 export function Sidebar({
-  role, debtMarketplace = false, footer,
+  role, debtMarketplace = false, sandbox = false, footer,
 }: {
   role: NavRole
   debtMarketplace?: boolean
+  /** True inside the demonstration or practice environment. */
+  sandbox?: boolean
   footer?: React.ReactNode
 }) {
   const pathname = usePathname()
-  const groups = navForRole(role, debtMarketplace)
+  const groups = navForRole(role, debtMarketplace, sandbox)
 
   const isActive = (href: string, prefix?: boolean) =>
     prefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href
@@ -86,10 +88,16 @@ export function Sidebar({
  * being readable, so anything past the fifth moves into "More". Settings is
  * always the last thing reachable, whether or not it lands in the overflow.
  */
-export function MobileNav({ role, debtMarketplace = false }: { role: NavRole; debtMarketplace?: boolean }) {
+export function MobileNav({
+  role, debtMarketplace = false, sandbox = false,
+}: {
+  role: NavRole
+  debtMarketplace?: boolean
+  sandbox?: boolean
+}) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-  const all = [...navForRole(role, debtMarketplace).flatMap((group) => group.items), SETTINGS_ITEM]
+  const all = [...navForRole(role, debtMarketplace, sandbox).flatMap((group) => group.items), SETTINGS_ITEM]
   const overflowing = all.length > 5
   const primary = overflowing ? all.slice(0, 4) : all
   const overflow = overflowing ? all.slice(4) : []
