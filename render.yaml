@@ -14,6 +14,10 @@ services:
     name: carecapital-exchange
     runtime: node
     plan: free
+    # Pinned rather than left to default. Render's default is whatever GitHub
+    # reports as the repository's default branch, which is a setting that can
+    # change without anyone touching this file.
+    branch: claude/eager-darwin-kw0lca
     buildCommand: npm ci && npm run build
     startCommand: npm run start
     healthCheckPath: /
@@ -32,3 +36,13 @@ services:
       # needs no network access and cannot invent a number.
       - key: AI_PROVIDER
         value: mock
+      # The product this deployment presents. Off is also the code default, but
+      # a blueprint that leaves it implicit is a blueprint whose behaviour
+      # changes when a default does.
+      - key: DEBT_MARKETPLACE_ENABLED
+        value: "false"
+      # Seeds sixteen fictional properties, fourteen raises and fourteen
+      # investors on the first request. Set to false for a deployment that
+      # should start empty — one-click demo sign-in disappears with it.
+      - key: SEED_DEMO_DATA
+        value: "true"
