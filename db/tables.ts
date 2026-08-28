@@ -20,6 +20,10 @@ import type {
   OfferingDisclosure, OfferingDocument, OfferingEligibility, OfferingTerms, OfferingVersion,
   RiskAssessment, SavedInvestment, TaxDocument, WaterfallStructure, WaterfallTier,
 } from '@/types/equity'
+import type {
+  CashAccount, CashLedgerEntry, CashTransfer, FundingSource, InvestmentOrder, InvestorAccount,
+  ProviderAccount, ProviderTransaction,
+} from '@/types/accounts'
 
 export interface Tables {
   users: User
@@ -77,6 +81,14 @@ export interface Tables {
   offering_versions: OfferingVersion
   disclosure_acknowledgements: DisclosureAcknowledgement
   nda_acceptances: NdaAcceptance
+  investor_accounts: InvestorAccount
+  cash_accounts: CashAccount
+  cash_ledger_entries: CashLedgerEntry
+  cash_transfers: CashTransfer
+  funding_sources: FundingSource
+  investment_orders: InvestmentOrder
+  provider_accounts: ProviderAccount
+  provider_transactions: ProviderTransaction
   investment_interests: InvestmentInterest
   investment_commitments: InvestmentCommitment
   investment_transactions: InvestmentTransaction
@@ -118,6 +130,8 @@ export const TABLE_NAMES: TableName[] = [
   'investor_updates', 'tax_documents', 'investor_questions', 'investor_answers',
   'risk_assessments', 'investment_scenarios', 'capital_stacks', 'capital_sources',
   'investor_matches', 'saved_investments', 'compliance_reviews', 'nda_acceptances',
+  'investor_accounts', 'cash_accounts', 'cash_ledger_entries', 'cash_transfers',
+  'funding_sources', 'investment_orders', 'provider_accounts', 'provider_transactions',
 ]
 
 /** Tables that must never be updated or deleted through the ordinary data API. */
@@ -129,4 +143,19 @@ export const APPEND_ONLY_TABLES: TableName[] = [
   // The same reasoning: a countersigned agreement that can be edited is not
   // evidence of anything.
   'nda_acceptances',
+  // `cash_ledger_entries` is deliberately NOT listed here, and the reason is
+  // worth stating because it looks like an omission.
+  //
+  // A ledger entry's amount, type, account and idempotency key are immutable —
+  // a balance derived from editable history cannot be reconciled against a
+  // provider, and a mistake is corrected by posting a reversing entry. But an
+  // entry's `status` legitimately advances: a deposit is recorded when it is
+  // instructed and posts when it clears, and that is one event arriving in two
+  // parts rather than a rewrite of history.
+  //
+  // This flag is all-or-nothing, so it cannot express "every column but one".
+  // The real rule is enforced where it can be exact: `services/accounts/ledger`
+  // exposes no way to change anything but status, and migration 0006 installs
+  // a trigger that rejects an UPDATE touching any other column — which holds
+  // even against something writing SQL directly.
 ]

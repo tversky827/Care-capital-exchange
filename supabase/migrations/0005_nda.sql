@@ -41,7 +41,7 @@ alter table nda_acceptances enable row level security;
 -- is the other half of what the agreement is for.
 create policy nda_acceptances_read on nda_acceptances
   for select using (
-    company_id = any (ccx_company_ids())
+    company_id in (select ccx_company_ids())
     or ccx_owns_offering(offering_id)
     or ccx_is_admin()
   );
@@ -49,7 +49,7 @@ create policy nda_acceptances_read on nda_acceptances
 -- Signing is done for your own organisation and nobody else's.
 create policy nda_acceptances_insert on nda_acceptances
   for insert with check (
-    company_id = any (ccx_company_ids())
+    company_id in (select ccx_company_ids())
     and user_id = ccx_user_id()
   );
 

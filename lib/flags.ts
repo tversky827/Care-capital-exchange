@@ -50,6 +50,40 @@ export const FLAGS = {
   DISTRIBUTIONS_ENABLED: true,
   /** Tax document tracking is visible to investors. */
   TAX_DOCUMENTS_ENABLED: true,
+
+  // --- The investor platform ------------------------------------------------
+  /** Investor accounts, cash and orders as a whole. */
+  INVESTOR_PLATFORM_ENABLED: true,
+  /** An investor holds an account with a status and a set of checks. */
+  INVESTOR_ACCOUNTS_ENABLED: true,
+  /** That account holds cash, funded once and deployed many times. */
+  CASH_ACCOUNT_ENABLED: true,
+  /** Orders may be placed against an offering from that cash. */
+  INVESTMENT_ORDERS_ENABLED: true,
+  /** Rules that pre-authorise an allocation. The rules engine only; see below. */
+  AUTO_INVEST_ENABLED: false,
+  /** The tax centre is visible. */
+  TAX_CENTER_ENABLED: true,
+
+  // --- The two that decide whether any of it is real ------------------------
+  /**
+   * Money actually moves.
+   *
+   * Off means every deposit, withdrawal and debit is recorded against demo
+   * providers and no bank is ever contacted. Turning it on without registering
+   * a real payment provider throws rather than silently crediting balances
+   * against money that did not move — see `services/accounts/providers`.
+   */
+  REAL_MONEY_ENABLED: false,
+  /**
+   * Securities transactions are actually effected.
+   *
+   * Off means an order settles into a position in this database and nothing
+   * else. No security is bought, sold, transferred or registered.
+   */
+  REAL_SECURITIES_ENABLED: false,
+  /** Positions may be transferred between investors. Not built. */
+  SECONDARY_MARKET_ENABLED: false,
 } as const
 
 export type FeatureFlag = keyof typeof FLAGS
@@ -77,6 +111,17 @@ export function isEnabled(flag: FeatureFlag): boolean {
  * marketplace, so asking for the child implies asking for the parent too.
  */
 const REQUIRES: Partial<Record<FeatureFlag, FeatureFlag[]>> = {
+  INVESTOR_ACCOUNTS_ENABLED: ['INVESTOR_PLATFORM_ENABLED'],
+  CASH_ACCOUNT_ENABLED: ['INVESTOR_PLATFORM_ENABLED', 'INVESTOR_ACCOUNTS_ENABLED'],
+  INVESTMENT_ORDERS_ENABLED: [
+    'INVESTOR_PLATFORM_ENABLED', 'INVESTOR_ACCOUNTS_ENABLED', 'CASH_ACCOUNT_ENABLED',
+    'EQUITY_MARKETPLACE_ENABLED',
+  ],
+  AUTO_INVEST_ENABLED: ['INVESTMENT_ORDERS_ENABLED'],
+  TAX_CENTER_ENABLED: ['INVESTOR_PLATFORM_ENABLED'],
+  REAL_MONEY_ENABLED: ['CASH_ACCOUNT_ENABLED'],
+  REAL_SECURITIES_ENABLED: ['INVESTMENT_ORDERS_ENABLED'],
+  SECONDARY_MARKET_ENABLED: ['REAL_SECURITIES_ENABLED'],
   INVESTOR_ONBOARDING_ENABLED: ['EQUITY_MARKETPLACE_ENABLED'],
   INVESTMENT_COMMITMENTS_ENABLED: ['EQUITY_MARKETPLACE_ENABLED'],
   INVESTMENT_TRANSACTIONS_ENABLED: ['EQUITY_MARKETPLACE_ENABLED', 'INVESTMENT_COMMITMENTS_ENABLED'],
