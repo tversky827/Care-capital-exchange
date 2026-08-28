@@ -1,7 +1,7 @@
 import type { Store } from '@/db'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { dealEquity, project } from '@/lib/equity/projections'
-import { defaultTiers } from '@/lib/equity/waterfall'
+import { defaultTiers, runWaterfall } from '@/lib/equity/waterfall'
 import { ownershipShare } from '@/lib/equity/returns'
 import { round } from '@/lib/finance/calculations'
 import type { Company, CompanyMember, Deal, User } from '@/types'
@@ -834,6 +834,16 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
     }
 
     // --- distributions ------------------------------------------------------
+    // Split by the same waterfall the running service uses, rather than being
+    // asserted here. Calling everything a preferred return made the statement
+    // columns all zero except one, and — worse — meant the demonstration data
+    // and the engine could disagree about what a payment was made of.
+    const waterfallTiers = await store.select('waterfall_tiers', {
+      where: { waterfall_id: waterfallId }, orderBy: { field: 'sequence' },
+    })
+    const totalInvested = round(accepted.reduce((sum, c) => sum + c.amount, 0), 2)
+    let capitalReturnedToDate = 0
+
     for (const distribution of fixture.distributions ?? []) {
       const event = await store.insert('distribution_events', {
         offering_id: offering.id,
@@ -850,21 +860,38 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
         notes: null,
       } as Omit<DistributionEvent, 'id' | 'created_at' | 'updated_at'>)
 
-      const totalInvested = accepted.reduce((sum, c) => sum + c.amount, 0)
+      if (totalInvested <= 0) continue
+      const result = runWaterfall({
+        structure: {
+          kind: 'preferred_return_promote',
+          cumulative_preferred: true,
+          has_catch_up: false,
+          catch_up_pct: null,
+        },
+        tiers: waterfallTiers,
+        contributedCapital: totalInvested,
+        capitalReturnedToDate,
+        unpaidPreferredToDate: 0,
+        cashAvailable: distribution.amount,
+        periodYears: 0.25,
+        preferredReturnPct: fixture.preferredReturnPct,
+      })
+      capitalReturnedToDate = round(capitalReturnedToDate + result.returnOfCapital, 2)
+
       for (const entry of accepted) {
         const position = positions.get(entry.investor)
-        if (!position || totalInvested <= 0) continue
+        if (!position) continue
         const share = entry.amount / totalInvested
-        const amount = round(distribution.amount * share, 2)
+        const amount = round(result.totalToLimitedPartners * share, 2)
         await store.insert('investment_distributions', {
           distribution_event_id: event.id,
           position_id: position.id,
           investor_id: position.investor_id,
           offering_id: offering.id,
           amount,
-          return_of_capital: 0,
-          preferred_return: amount,
-          profit_share: 0,
+          return_of_capital: round(result.returnOfCapital * share, 2),
+          preferred_return: round(result.preferredReturn * share, 2),
+          profit_share: round(result.profitShare * share, 2),
           status: 'processed',
           processed_at: now,
         } as Omit<InvestmentDistribution, 'id' | 'created_at' | 'updated_at'>)

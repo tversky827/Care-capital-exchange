@@ -216,7 +216,7 @@ export default async function OfferingPage({
 
                   <Disclose summary="Show the year-by-year working">
                     <div className="overflow-x-auto">
-                      <Table>
+                      <Table minWidth="min-w-[44rem]">
                         <thead>
                           <Tr>
                             <Th>Year</Th>

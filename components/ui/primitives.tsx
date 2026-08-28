@@ -137,10 +137,22 @@ export function StatusDot({ tone = 'neutral', className }: { tone?: Tone; classN
 // Tables
 // ---------------------------------------------------------------------------
 
-export function Table({ className, ...props }: ComponentProps<'table'>) {
+/**
+ * A data table.
+ *
+ * `minWidth` is the width below which the columns stop being readable and the
+ * table should scroll inside its container instead of compressing. Without it
+ * a six-column table on a phone squeezes every column to nothing and silently
+ * clips the last two — the wrapper scrolls, but `w-full` never gives it
+ * anything to scroll. Pass a Tailwind min-width class on any table wide enough
+ * to need one; narrow tables are better off fitting.
+ */
+export function Table({
+  className, minWidth, ...props
+}: ComponentProps<'table'> & { minWidth?: string }) {
   return (
     <div className="w-full overflow-x-auto">
-      <table className={cn('w-full border-collapse text-[13px]', className)} {...props} />
+      <table className={cn('w-full border-collapse text-[13px]', minWidth, className)} {...props} />
     </div>
   )
 }

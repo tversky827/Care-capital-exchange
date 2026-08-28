@@ -228,6 +228,7 @@ async function main(): Promise<void> {
       { path: '/investor', expect: 'Available to invest' },
       { path: '/investor/cash', expect: 'Every movement' },
       { path: '/investor/activity', expect: 'Activity' },
+      { path: '/investor/distributions', expect: 'Paid to you, all time' },
       { path: '/investor/dashboard', expect: 'Portfolio overview' },
       { path: '/investments', expect: 'Invest in healthcare properties' },
       { path: '/investor/opportunities', expect: 'Opportunities for you' },

@@ -79,7 +79,12 @@ export default async function InvestorHomePage() {
           <Figure label="Account value" value={format(portfolioValue)} hint="holdings at cost plus cash" />
           <Figure label="Available to invest" value={format(spendable)} hint="settled and uncommitted" />
           <Figure label="Invested" value={format(invested)} hint={`${portfolio.positions.length} holding${portfolio.positions.length === 1 ? '' : 's'}`} />
-          <Figure label="Distributions received" value={format(distributions)} hint="paid to you, all time" />
+          <Figure
+            label="Distributions received"
+            value={format(distributions)}
+            hint="paid to you, all time"
+            href={distributions > 0 ? '/investor/distributions' : undefined}
+          />
         </dl>
         <div className="flex flex-wrap gap-2 border-t border-line px-4 py-3">
           <Link href="/investor/cash"><Button size="sm" variant="primary">Add funds</Button></Link>
@@ -208,12 +213,25 @@ function greeting(): string {
   return 'Good evening'
 }
 
-function Figure({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="px-4 py-3">
+function Figure({
+  label, value, hint, href,
+}: {
+  label: string
+  value: string
+  hint: string
+  /** Given when the figure has somewhere to go; the whole cell becomes the link. */
+  href?: string
+}) {
+  const body = (
+    <>
       <dt className="text-[10px] uppercase tracking-[0.05em] text-ink-muted">{label}</dt>
       <dd className="tnum mt-1 text-[20px] font-semibold text-ink">{value}</dd>
       <dd className="mt-0.5 text-[11px] text-ink-muted">{hint}</dd>
-    </div>
+    </>
+  )
+  return href ? (
+    <Link href={href} className="block px-4 py-3 transition-colors hover:bg-surface-sunken">{body}</Link>
+  ) : (
+    <div className="px-4 py-3">{body}</div>
   )
 }

@@ -104,7 +104,7 @@ export default async function InvestorDocumentsPage() {
         <Card>
           <CardHeader><CardTitle>Tax documents</CardTitle></CardHeader>
           <CardBody className="overflow-x-auto p-0">
-            <Table>
+            <Table minWidth="min-w-[38rem]">
               <thead>
                 <Tr><Th>Year</Th><Th>Form</Th><Th>Investment</Th><Th>Status</Th><Th>Available</Th></Tr>
               </thead>

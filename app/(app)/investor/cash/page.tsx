@@ -102,26 +102,51 @@ export default async function CashPage() {
           {entries.length === 0 ? (
             <p className="p-4 text-[13px] text-ink-muted">Nothing has moved yet.</p>
           ) : (
-            <Table>
-              <thead>
-                <Tr>
-                  <Th>Date</Th>
-                  <Th>What</Th>
-                  <Th>Status</Th>
-                  <Th numeric>Amount</Th>
-                </Tr>
-              </thead>
-              <tbody>
+            <>
+              {/* On a phone the amount is the column that matters, and a
+                  four-column table puts it off the right-hand edge. Below the
+                  breakpoint each entry becomes a row of its own instead. */}
+              <ul className="md:hidden">
                 {entries.map((entry) => (
-                  <Tr key={entry.id}>
-                    <Td className="whitespace-nowrap text-ink-muted">{formatDate(entry.effective_at)}</Td>
-                    <Td className="text-ink">{entry.description}</Td>
-                    <Td><LedgerStatus status={entry.status} /></Td>
-                    <Td numeric><LedgerAmount cents={entry.amount_cents} /></Td>
-                  </Tr>
+                  <li
+                    key={entry.id}
+                    className="flex items-start justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-[13px] text-ink">{entry.description}</span>
+                      <span className="mt-0.5 flex items-center gap-2">
+                        <span className="text-[11px] text-ink-muted">{formatDate(entry.effective_at)}</span>
+                        <LedgerStatus status={entry.status} />
+                      </span>
+                    </span>
+                    <LedgerAmount cents={entry.amount_cents} />
+                  </li>
                 ))}
-              </tbody>
-            </Table>
+              </ul>
+
+              <div className="hidden md:block">
+                <Table>
+                  <thead>
+                    <Tr>
+                      <Th>Date</Th>
+                      <Th>What</Th>
+                      <Th>Status</Th>
+                      <Th numeric>Amount</Th>
+                    </Tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((entry) => (
+                      <Tr key={entry.id}>
+                        <Td className="whitespace-nowrap text-ink-muted">{formatDate(entry.effective_at)}</Td>
+                        <Td className="text-ink">{entry.description}</Td>
+                        <Td><LedgerStatus status={entry.status} /></Td>
+                        <Td numeric><LedgerAmount cents={entry.amount_cents} /></Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            </>
           )}
         </CardBody>
       </Section>

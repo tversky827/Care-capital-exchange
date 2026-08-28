@@ -53,7 +53,7 @@ export default async function PortfolioPage() {
         <Card>
           <CardHeader><CardTitle>Positions</CardTitle></CardHeader>
           <CardBody className="overflow-x-auto p-0">
-            <Table>
+            <Table minWidth="min-w-[48rem]">
               <thead>
                 <Tr>
                   <Th>Investment</Th>
@@ -158,34 +158,18 @@ export default async function PortfolioPage() {
 
       {portfolio.positions.some((p) => p.distributions.length > 0) ? (
         <Card>
-          <CardHeader><CardTitle>Distributions received</CardTitle></CardHeader>
-          <CardBody className="overflow-x-auto p-0">
-            <Table>
-              <thead>
-                <Tr>
-                  <Th>Investment</Th>
-                  <Th numeric>Amount</Th>
-                  <Th numeric>Return of capital</Th>
-                  <Th numeric>Preferred</Th>
-                  <Th numeric>Profit share</Th>
-                  <Th>Paid</Th>
-                </Tr>
-              </thead>
-              <tbody>
-                {portfolio.positions.flatMap((row) =>
-                  row.distributions.map((distribution) => (
-                    <Tr key={distribution.id}>
-                      <Td>{row.offering.name}</Td>
-                      <Td numeric>{formatCurrency(distribution.amount)}</Td>
-                      <Td numeric>{formatCurrency(distribution.return_of_capital)}</Td>
-                      <Td numeric>{formatCurrency(distribution.preferred_return)}</Td>
-                      <Td numeric>{formatCurrency(distribution.profit_share)}</Td>
-                      <Td>{distribution.processed_at ? formatDate(distribution.processed_at) : '—'}</Td>
-                    </Tr>
-                  )),
-                )}
-              </tbody>
-            </Table>
+          <CardBody className="flex flex-wrap items-baseline justify-between gap-3">
+            <span>
+              <span className="block text-[13px] font-medium text-ink">
+                {formatCurrency(portfolio.distributionsReceived)} has been paid out to you
+              </span>
+              <span className="block text-[12px] text-ink-muted">
+                Every payment, split into return of capital, preferred return and profit share.
+              </span>
+            </span>
+            <Link href="/investor/distributions" className="text-[13px] font-medium text-accent hover:underline">
+              See distributions
+            </Link>
           </CardBody>
         </Card>
       ) : null}

@@ -32,9 +32,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar role={role} debtMarketplace={debtMarketplace} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar actor={actor} />
-        <MobileNav role={role} debtMarketplace={debtMarketplace} />
         {demoDeals > 0 ? <DemoBanner className="no-print" /> : null}
         <main className="min-w-0 flex-1 px-4 py-5 lg:px-6 lg:py-6">{children}</main>
+        {/* Last in the flow: on a phone this is a bar fixed to the bottom of
+            the viewport, and the spacer it renders has to follow the content
+            it is keeping clear. */}
+        <MobileNav role={role} debtMarketplace={debtMarketplace} />
       </div>
     </div>
   )

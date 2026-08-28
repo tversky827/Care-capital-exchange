@@ -2,8 +2,8 @@
 
 import type { LucideIcon } from 'lucide-react'
 import {
-  Activity, BarChart3, Briefcase, Building2, FileText, Gauge, Home, LayoutDashboard, ListChecks,
-  Receipt, Search, Settings, ShieldCheck, Store, Users, Wallet, Workflow,
+  Activity, BarChart3, Briefcase, Building2, Coins, FileText, Gauge, Home, LayoutDashboard,
+  ListChecks, Receipt, Search, Settings, ShieldCheck, Store, Users, Wallet, Workflow,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -12,6 +12,8 @@ export interface NavItem {
   icon: LucideIcon
   /** Matches nested routes as well as the exact path. */
   prefix?: boolean
+  /** Used where the label has to fit under an icon, as on a phone. */
+  short?: string
 }
 
 export interface NavGroup {
@@ -140,8 +142,8 @@ export const INVESTOR_NAV: NavGroup[] = [
     label: '',
     items: [
       { href: '/investor', label: 'Home', icon: Home },
-      { href: '/investments', label: 'Browse investments', icon: Store, prefix: true },
-      { href: '/investor/portfolio', label: 'My portfolio', icon: Briefcase, prefix: true },
+      { href: '/investments', label: 'Browse investments', icon: Store, prefix: true, short: 'Browse' },
+      { href: '/investor/portfolio', label: 'My portfolio', icon: Briefcase, prefix: true, short: 'Portfolio' },
       { href: '/investor/cash', label: 'Cash', icon: Wallet, prefix: true },
       { href: '/investor/activity', label: 'Activity', icon: Receipt, prefix: true },
     ],
@@ -149,6 +151,7 @@ export const INVESTOR_NAV: NavGroup[] = [
   {
     label: '',
     items: [
+      { href: '/investor/distributions', label: 'Distributions', icon: Coins, prefix: true },
       { href: '/notifications', label: 'Updates', icon: Activity },
     ],
   },
