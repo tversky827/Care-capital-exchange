@@ -5,7 +5,8 @@ import { bearCaseSchema, investmentAnalysisSchema } from '@/lib/ai/schemas'
 import { analyzeInvestment, bearCase, type InvestmentAnalysisInput } from '@/lib/ai/local/investment'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import {
-  NEUTRAL_SCENARIO, project, projectScenario, SCENARIO_PRESETS, type Projection, type ProjectionInput,
+  dealEquity, NEUTRAL_SCENARIO, project, projectScenario, SCENARIO_PRESETS,
+  type Projection, type ProjectionInput,
 } from '@/lib/equity/projections'
 import { assessRisk, type RiskResult } from '@/lib/equity/risk'
 import { recordAiUsage } from '../ai-usage'
@@ -57,7 +58,11 @@ export async function projectionInputFor(
     amortizationMonths: snapshot.assumedTerms.amortizationMonths,
     interestOnlyMonths: snapshot.terms?.requested_io_months ?? 0,
     investorEquity: offering.target_raise,
-    totalEquity: snapshot.summary.equityRequirement ?? offering.target_raise,
+    totalEquity: dealEquity(
+      snapshot.summary.valueBasis,
+      snapshot.summary.loanAmount,
+      offering.target_raise,
+    ),
     purchasePrice: snapshot.terms?.purchase_price ?? null,
     holdYears: assumptions?.hold_years ?? (terms?.target_hold_months ? terms.target_hold_months / 12 : null),
     revenueGrowthPct: assumptions?.revenue_growth_pct ?? null,

@@ -225,6 +225,9 @@ async function main(): Promise<void> {
     console.log('Investor routes')
     const investor = await cookieFor(investorUser.email)
     failures += await run('investor', investor, [
+      { path: '/investor', expect: 'Available to invest' },
+      { path: '/investor/cash', expect: 'Every movement' },
+      { path: '/investor/activity', expect: 'Activity' },
       { path: '/investor/dashboard', expect: 'Portfolio overview' },
       { path: '/investments', expect: 'Invest in healthcare properties' },
       { path: '/investor/opportunities', expect: 'Opportunities for you' },

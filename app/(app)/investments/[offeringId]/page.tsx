@@ -11,7 +11,7 @@ import {
   Alert, Badge, Card, CardBody, DefinitionList, Progress, Section, Table, Td, Th, Tr,
 } from '@/components/ui/primitives'
 import { CapitalStackChart } from '@/components/equity/capital-stack-chart'
-import { InvestorActions } from './actions-panel'
+import { InvestmentTicket } from './ticket'
 import { NdaGate } from './nda-gate'
 import { AskPanel } from './ask-panel'
 import { BearCase } from './bear-case'
@@ -22,6 +22,8 @@ import { dataRoomFor, lockedCounts } from '@/services/equity/data-room'
 import { evaluateEligibility } from '@/services/equity/commitments'
 import { questionsFor } from '@/services/equity/portfolio'
 import { ndaState } from '@/services/equity/nda'
+import { accountFor } from '@/services/accounts/accounts'
+import { spendableFor } from '@/services/accounts/ledger'
 import { CURRENT_NDA } from '@/lib/equity/nda'
 import type { EligibilityResult } from '@/lib/equity/eligibility'
 
@@ -77,22 +79,38 @@ export default async function OfferingPage({
     ])
     : [null, null, [], [], []]
 
+  // What the ticket needs: whether they may invest, how much cash is actually
+  // spendable right now, what they already hold here, and what they will be
+  // asked to acknowledge. All of it is loaded server-side; the ticket computes
+  // no money and is handed no way to.
   let eligibility: EligibilityResult | null = null
+  let committedCents: number | null = null
+  let spendableCents = 0
+  let hasAccount = false
   let hasInterest = false
-  let committed: number | null = null
+  let disclosures: { id: string; title: string }[] = []
   if (actor.investor && nda.accepted) {
     const investorId = actor.investor.id
-    const [result, interest, commitments] = await Promise.all([
+    const [result, commitments, account, required, interest] = await Promise.all([
       evaluateEligibility(actor, offeringId).catch(() => null),
-      store.selectOne('investment_interests', { where: { offering_id: offeringId, investor_id: investorId } }),
       store.select('investment_commitments', { where: { offering_id: offeringId, investor_id: investorId } }),
+      accountFor(actor),
+      store.select('offering_disclosures', { where: { offering_id: offeringId } }),
+      store.selectOne('investment_interests', { where: { offering_id: offeringId, investor_id: investorId } }),
     ])
     eligibility = result
+    hasAccount = Boolean(account)
     hasInterest = Boolean(interest && !interest.withdrawn_at && interest.expressed_at)
+    if (account) spendableCents = await spendableFor(account.id)
+    disclosures = required
+      .filter((disclosure) => disclosure.required)
+      .map((disclosure) => ({ id: disclosure.id, title: disclosure.title }))
     // Withdrawn and rejected commitments are not "you are in"; anything still
     // standing is, and its amount is what the investor should be shown.
     const live = commitments.filter((c) => ['submitted', 'accepted', 'funded'].includes(c.status))
-    committed = live.length > 0 ? live.reduce((total, c) => total + c.amount, 0) : null
+    committedCents = live.length > 0
+      ? live.reduce((total, c) => total + Math.round(c.amount * 100), 0)
+      : null
   }
 
   const { deal, facility, sponsor, summary, latest, prior } = snapshot
@@ -419,15 +437,26 @@ export default async function OfferingPage({
 
         {/* ---- the one action panel ------------------------------------------ */}
         <div>
-          <InvestorActions
+          <InvestmentTicket
             offeringId={offeringId}
+            offeringName={offeringTitle(offering, deal, facility, revealIdentity)}
             minimum={offering.minimum_investment}
             maximum={offering.maximum_investment}
+            availableCents={spendableCents}
             eligibility={eligibility}
-            isInvestor={Boolean(actor.investor)}
             status={offering.status}
+            isInvestor={Boolean(actor.investor)}
+            hasAccount={hasAccount}
+            committedCents={committedCents}
+            disclosures={disclosures}
+            fees={{
+              acquisitionPct: terms?.acquisition_fee_pct ?? null,
+              managementPct: terms?.asset_management_fee_pct ?? null,
+              dispositionPct: terms?.disposition_fee_pct ?? null,
+            }}
+            holdYears={terms?.target_hold_months ? Math.round(terms.target_hold_months / 12) : null}
+            structure={terms?.capital_position === 'preferred_equity' ? 'Preferred equity' : 'Common equity'}
             hasInterest={hasInterest}
-            committed={committed}
           />
         </div>
       </div>

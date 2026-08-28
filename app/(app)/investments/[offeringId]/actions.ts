@@ -2,12 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
-import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
 import { ForbiddenError } from '@/lib/policy'
-import {
-  acknowledgeDisclosures, recordInterest, submitCommitment, withdrawInterest,
-} from '@/services/equity/commitments'
+import { recordInterest, withdrawInterest } from '@/services/equity/commitments'
 import { askOffering, projectInvestment, runBearCase } from '@/services/equity/analysis'
 import { acceptNda, requireNda } from '@/services/equity/nda'
 import { askQuestion } from '@/services/equity/portfolio'
@@ -54,52 +51,6 @@ export async function withdrawInterestAction(
     await withdrawInterest(actor, offeringId)
     revalidatePath(`/investments/${offeringId}`)
     return { success: 'Your interest has been withdrawn.' }
-  } catch (error) {
-    return failure(error)
-  }
-}
-
-export async function acknowledgeAction(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const offeringId = String(formData.get('offeringId') ?? '')
-  try {
-    const actor = await requireActor()
-    const store = await db()
-    const disclosures = await store.select('offering_disclosures', {
-      where: { offering_id: offeringId },
-    })
-    const requestHeaders = await headers()
-    await acknowledgeDisclosures(
-      actor,
-      offeringId,
-      disclosures.filter((d) => d.required).map((d) => d.id),
-      {
-        // Recorded because an acknowledgement is evidentiary, not for tracking.
-        ip: requestHeaders.get('x-forwarded-for'),
-        userAgent: requestHeaders.get('user-agent'),
-      },
-    )
-    revalidatePath(`/investments/${offeringId}`)
-    return { success: 'Disclosures acknowledged.' }
-  } catch (error) {
-    return failure(error)
-  }
-}
-
-export async function commitAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const offeringId = String(formData.get('offeringId') ?? '')
-  const raw = String(formData.get('amount') ?? '').replace(/[^0-9.]/g, '')
-  if (!raw) return { error: 'Enter the amount you intend to invest.' }
-  try {
-    const actor = await requireActor()
-    await submitCommitment(actor, offeringId, Number(raw))
-    revalidatePath(`/investments/${offeringId}`)
-    return {
-      success:
-        'Your commitment has been recorded and sent to the sponsor. This is an indication of intent, not a completed securities transaction.',
-    }
   } catch (error) {
     return failure(error)
   }

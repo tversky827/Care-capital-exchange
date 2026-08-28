@@ -26,8 +26,10 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4">
-        {groups.map((group) => (
-          <div key={group.label} className="mb-5">
+        {/* Keyed by position: a group's label is optional, and two unlabelled
+            groups are a legitimate way to draw a divider. */}
+        {groups.map((group, index) => (
+          <div key={index} className="mb-5">
             {group.label ? <p className="eyebrow px-2 pb-1.5">{group.label}</p> : null}
             <ul className="space-y-0.5">
               {group.items.map((item) => (

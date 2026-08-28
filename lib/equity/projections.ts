@@ -94,6 +94,33 @@ function missing(reason: string): Projection {
 }
 
 /**
+ * The equity the deal actually carries, which is what an investor's stake is a
+ * share of.
+ *
+ * `equityRequirement` from the underwriting summary is cash to close, and that
+ * is a different quantity: on a cash-out refinance it is legitimately zero or
+ * negative, and on a lightly-levered purchase it can come out below the raise
+ * itself. Either way, dividing the raise by it produces an ownership share
+ * above 100% — which is how one demonstration offering came to advertise a
+ * 105% annual return on a 13.87x multiple.
+ *
+ * The total equity in a deal is never less than the equity being raised into
+ * it, so the raise is the floor.
+ */
+export function dealEquity(
+  basis: Maybe,
+  loanAmount: Maybe,
+  investorEquity: Maybe,
+): number | null {
+  const raise = num(investorEquity)
+  const value = num(basis)
+  const debt = num(loanAmount)
+  if (value === null || debt === null) return raise
+  if (raise === null) return Math.max(value - debt, 0)
+  return Math.max(value - debt, raise)
+}
+
+/**
  * Projects the hold period.
  *
  * The model is deliberately simple and legible: operating income grows at the

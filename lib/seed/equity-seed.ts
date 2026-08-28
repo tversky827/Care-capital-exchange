@@ -1,6 +1,6 @@
 import type { Store } from '@/db'
 import { buildSnapshot } from '@/lib/deal/snapshot'
-import { project } from '@/lib/equity/projections'
+import { dealEquity, project } from '@/lib/equity/projections'
 import { defaultTiers } from '@/lib/equity/waterfall'
 import { ownershipShare } from '@/lib/equity/returns'
 import { round } from '@/lib/finance/calculations'
@@ -619,12 +619,10 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
       )
     }
 
-    // The equity the deal actually carries, which is what an investor's stake
-    // is a share of. `equityRequirement` is cash to close: legitimately zero on
-    // a cash-out refinance, where it would make the raise 100% of nothing.
-    const dealEquity = basis !== null && snapshot?.summary.loanAmount !== null
-      ? Math.max(basis - (snapshot?.summary.loanAmount ?? 0), fixture.targetRaise)
-      : fixture.targetRaise
+    // What the investor's stake is a share of, by the same rule the running
+    // app uses — one rule, so a seeded target return cannot disagree with the
+    // projection the offering page renders from it.
+    const equityInDeal = dealEquity(basis, snapshot?.summary.loanAmount ?? null, fixture.targetRaise)
 
     const accepted = fixture.commitments.filter((c) => c.accepted)
     const committed = round(accepted.reduce((sum, c) => sum + c.amount, 0), 2)
@@ -693,7 +691,7 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
         amortizationMonths: snapshot.assumedTerms.amortizationMonths,
         interestOnlyMonths: snapshot.terms?.requested_io_months ?? 0,
         investorEquity: fixture.targetRaise,
-        totalEquity: dealEquity,
+        totalEquity: equityInDeal,
         purchasePrice,
         holdYears: fixture.holdYears,
         revenueGrowthPct: fixture.revenueGrowthPct,
@@ -933,6 +931,126 @@ export async function seedEquityDemo(store: Store, hashPassword: (value: string)
   const published = await store.select('offerings', { where: { status: 'live' } })
   for (const offering of published) {
     await computeMatchesForOffering(offering.id)
+  }
+
+  await seedAccountsAndCash(store, profiles, investorUsers)
+}
+
+/**
+ * Investment accounts, cash and the ledger history behind them.
+ *
+ * Every investor who already holds a position must have an account whose
+ * ledger explains it: a deposit large enough to have funded what they bought,
+ * a debit for each holding, and a credit for each distribution they received.
+ * Anything less and the demo's own cash screen contradicts its own portfolio —
+ * a balance that does not reconcile is the fastest way to lose an audience
+ * that works in finance.
+ *
+ * The entries are written directly rather than through the order service
+ * because these are historical: the money moved before the demo opened. New
+ * orders placed inside the demo go through the real path.
+ */
+async function seedAccountsAndCash(
+  store: Store,
+  profiles: Map<string, InvestorProfile>,
+  investorUsers: Map<string, string>,
+): Promise<void> {
+  const now = new Date().toISOString()
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString()
+
+  let reference = 100_001
+  for (const [slug, profile] of profiles) {
+    const userId = investorUsers.get(slug)
+    if (!userId) continue
+
+    const positions = await store.select('investment_positions', { where: { investor_id: profile.id } })
+    const distributions = await store.select('investment_distributions', {
+      where: { investor_id: profile.id },
+    })
+    // Summed in cents from the same rounding each entry will use, so the
+    // opening deposit lands the balance on the intended figure exactly rather
+    // than a few cents off it.
+    const toCents = (dollars: number) => Math.round(dollars * 100)
+    const investedCents = positions.reduce((t, p) => t + toCents(p.invested_amount), 0)
+    const distributedCents = distributions.reduce((t, d) => t + toCents(d.amount), 0)
+
+
+    // Funded enough to have bought what they hold and still have something to
+    // deploy. Michael Demo — the account the demo signs in as — is funded so
+    // the *available* balance lands on exactly $125,000 after the distributions
+    // he has already received, because that is the figure the walkthrough
+    // quotes and a demo whose headline number is approximately right is worse
+    // than one that is exactly right.
+    const targetAvailableCents = slug === 'michael-demo'
+      ? 12_500_000
+      : Math.max(4_000_000, Math.round(investedCents * 0.35))
+    const depositCents = investedCents - distributedCents + targetAvailableCents
+
+    const account = await store.insert('investor_accounts', {
+      company_id: profile.company_id,
+      investor_id: profile.id,
+      account_type: profile.investor_type === 'individual' ? 'individual'
+        : profile.investor_type === 'trust' ? 'trust'
+        : profile.investor_type === 'family_office' ? 'family_office'
+        : profile.investor_type === 'institution' ? 'institution' : 'llc',
+      legal_name: profile.display_name,
+      reference: `ACC-${reference++}`,
+      status: 'active',
+      identity_status: 'passed',
+      kyc_status: 'passed',
+      aml_status: 'passed',
+      accreditation_status: profile.self_certified_accredited ? 'passed' : 'pending',
+      tax_status: 'passed',
+      activated_at: daysAgo(400),
+      status_reason: null,
+    } as never)
+
+    const cash = await store.insert('cash_accounts', {
+      account_id: account.id, currency: 'USD', provider: null,
+      provider_account_ref: null, status: 'open',
+    } as never)
+
+    const entry = async (
+      type: string, amountCents: number, description: string, at: string,
+      referenceType: string | null = null, referenceId: string | null = null,
+    ) => store.insert('cash_ledger_entries', {
+      cash_account_id: cash.id,
+      account_id: account.id,
+      type,
+      amount_cents: amountCents,
+      currency: 'USD',
+      status: 'posted',
+      description,
+      reference_type: referenceType,
+      reference_id: referenceId,
+      idempotency_key: `seed:${account.id}:${type}:${referenceId ?? at}:${amountCents}`,
+      reverses_entry_id: null,
+      provider_transaction_id: null,
+      effective_at: at,
+      posted_at: at,
+    } as never)
+
+    await entry('deposit', depositCents, 'Opening deposit', daysAgo(395))
+
+    for (const position of positions) {
+      const offering = await store.findById('offerings', position.offering_id)
+      await entry(
+        'investment_debit', -toCents(position.invested_amount),
+        `Investment in ${offering?.name ?? 'an offering'}`,
+        position.acquired_at ?? daysAgo(300), 'offering', position.offering_id,
+      )
+    }
+
+    for (const distribution of distributions) {
+      const event = await store.findById('distribution_events', distribution.distribution_event_id)
+      await entry(
+        'distribution_credit', toCents(distribution.amount),
+        `Distribution — ${event?.period_label ?? 'operating'}`,
+        distribution.processed_at ?? daysAgo(30), 'distribution', distribution.id,
+      )
+    }
+
+    void now
   }
 }
 

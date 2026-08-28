@@ -3,6 +3,7 @@ import {
   cashOnCash, equityMultiple, exitValueFromCapRate, exitValueFromMultiple,
   grown, irr, netSaleProceeds, ownershipShare,
 } from '@/lib/equity/returns'
+import { dealEquity, project, type ProjectionInput } from '@/lib/equity/projections'
 import { defaultTiers, runWaterfall, type WaterfallInput } from '@/lib/equity/waterfall'
 import { analyzeStructures, compareStructures } from '@/lib/equity/structures'
 import {
@@ -315,5 +316,61 @@ describe('investor email templates', () => {
   it('does not describe a commitment as a purchase of securities', () => {
     const message = commitmentStatusEmail('a@b.test', { ...context, status: 'accepted', amount: '$150,000' })
     expect(message.body).toMatch(/not itself a purchase of securities/)
+  })
+})
+
+describe('the equity a stake is a share of', () => {
+  // Cash to close is not total equity, and the difference is what decides an
+  // investor's ownership percentage — so every case is checked by hand.
+  it('is the value above the debt when that exceeds the raise', () => {
+    expect(dealEquity(17_720_000, 10_500_000, 3_500_000)).toBe(7_220_000)
+  })
+
+  it('never falls below the equity being raised into the deal', () => {
+    // A lightly-capitalised purchase: value less debt is $479,000, which is a
+    // quarter of the raise. Dividing the raise by it would hand the investor
+    // 417% of every dollar the deal produced.
+    expect(dealEquity(9_779_000, 9_300_000, 2_000_000)).toBe(2_000_000)
+  })
+
+  it('holds on a cash-out refinance, where the debt exceeds the value', () => {
+    expect(dealEquity(23_841_000, 24_700_000, 2_400_000)).toBe(2_400_000)
+  })
+
+  it('falls back to the raise when the basis or the debt is unknown', () => {
+    expect(dealEquity(null, 9_300_000, 2_000_000)).toBe(2_000_000)
+    expect(dealEquity(9_779_000, null, 2_000_000)).toBe(2_000_000)
+  })
+
+  it('keeps an investor from being projected more than the deal earns', () => {
+    // The full projection, run on the shape that produced the 105% return: the
+    // investor's share of the deal cannot exceed the whole of it.
+    const base: ProjectionInput = {
+      revenue: 12_400_000,
+      ebitda: 1_500_000,
+      noi: 1_208_459,
+      loanAmount: 9_300_000,
+      ratePct: 6.9,
+      amortizationMonths: 300,
+      interestOnlyMonths: 0,
+      investorEquity: 2_000_000,
+      totalEquity: dealEquity(9_779_000, 9_300_000, 2_000_000),
+      purchasePrice: 9_400_000,
+      holdYears: 5,
+      revenueGrowthPct: 3,
+      expenseGrowthPct: 3,
+      exitCapRatePct: 12.5,
+      exitMultipleOfEbitda: null,
+      sellingCostsPct: 2,
+      preferredReturnPct: 0.08,
+    }
+    const projection = project(base)
+    expect(projection.insufficientData).toBeNull()
+    // A share of one deal, priced off one exit: a multiple in the low single
+    // digits over five years. 13.87x was the arithmetic reporting an ownership
+    // stake of 417%.
+    expect(projection.equityMultiple!).toBeLessThan(5)
+    expect(projection.irrPct!).toBeLessThan(60)
+    expect(projection.investorExitProceeds!).toBeLessThanOrEqual(projection.netSaleProceeds!)
   })
 })

@@ -2,8 +2,8 @@
 
 import type { LucideIcon } from 'lucide-react'
 import {
-  Activity, BarChart3, Briefcase, Building2, FileText, Gauge, LayoutDashboard, ListChecks,
-  Search, Settings, ShieldCheck, Store, Users, Wallet, Workflow,
+  Activity, BarChart3, Briefcase, Building2, FileText, Gauge, Home, LayoutDashboard, ListChecks,
+  Receipt, Search, Settings, ShieldCheck, Store, Users, Wallet, Workflow,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -130,16 +130,25 @@ export const LOOKER_NAV: NavGroup[] = [
 /**
  * The investor's navigation.
  *
- * Three destinations: what you could buy, what you already own, what changed.
- * Saved offerings, matches, documents and the accreditation profile are all
- * reachable from inside those three, and none of them earns a permanent slot.
+ * Five destinations, in the order the questions get asked: where am I, what
+ * could I buy, what do I own, what is my cash doing, what has happened. Saved
+ * offerings, matches, documents and the accreditation profile are reachable
+ * from inside those, and none of them earns a permanent slot.
  */
 export const INVESTOR_NAV: NavGroup[] = [
   {
     label: '',
     items: [
+      { href: '/investor', label: 'Home', icon: Home },
       { href: '/investments', label: 'Browse investments', icon: Store, prefix: true },
       { href: '/investor/portfolio', label: 'My portfolio', icon: Briefcase, prefix: true },
+      { href: '/investor/cash', label: 'Cash', icon: Wallet, prefix: true },
+      { href: '/investor/activity', label: 'Activity', icon: Receipt, prefix: true },
+    ],
+  },
+  {
+    label: '',
+    items: [
       { href: '/notifications', label: 'Updates', icon: Activity },
     ],
   },
