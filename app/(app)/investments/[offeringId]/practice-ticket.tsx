@@ -2,11 +2,11 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { FlaskConical } from 'lucide-react'
+import { Bookmark, FlaskConical } from 'lucide-react'
 import { Alert, Button, Card, CardBody, CardHeader, CardTitle, Input } from '@/components/ui/primitives'
 import { format, formatWhole, parseAmount, type Cents } from '@/lib/money'
 import { formatPercent, formatRatio } from '@/lib/utils/format'
-import { practiceInvestAction } from '@/app/(app)/sandbox/actions'
+import { practiceInvestAction, toggleWatchAction } from '@/app/(app)/sandbox/actions'
 import { calculateAction } from './actions'
 
 /**
@@ -25,7 +25,8 @@ import { calculateAction } from './actions'
  * them the box is a formality, which is the opposite of what it is for.
  */
 export function PracticeTicket({
-  offeringId, offeringName, minimum, maximum, availableCents, status, heldCents, holdYears, structure,
+  offeringId, offeringName, minimum, maximum, availableCents, status, heldCents, holdYears,
+  structure, watching,
 }: {
   offeringId: string
   offeringName: string
@@ -37,6 +38,8 @@ export function PracticeTicket({
   heldCents: number | null
   holdYears: number | null
   structure: string
+  /** Whether this raise is already on the sandbox account's watchlist. */
+  watching: boolean
 }) {
   const [amount, setAmount] = useState(minimum ? String(minimum) : '')
   const [step, setStep] = useState<'amount' | 'review' | 'done'>('amount')
@@ -218,8 +221,46 @@ export function PracticeTicket({
           Virtual money. Nothing you do here creates an investment, a commitment or a financial
           obligation, and no sponsor is told.
         </p>
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
+          <Watch offeringId={offeringId} initial={watching} />
+          <Link
+            href={`/sandbox/scenario?offering=${offeringId}`}
+            className="text-[12px] text-accent hover:underline"
+          >
+            What if the assumptions were different?
+          </Link>
+        </div>
       </CardBody>
     </Card>
+  )
+}
+
+/**
+ * Keeping a raise to come back to.
+ *
+ * No operator is told. A watchlist that quietly signalled interest would turn
+ * the sandbox into a channel for it, and the promise that nothing here creates
+ * an obligation would start eroding in practice while staying true in the
+ * database.
+ */
+function Watch({ offeringId, initial }: { offeringId: string; initial: boolean }) {
+  const [watching, setWatching] = useState(initial)
+  const [pending, start] = useTransition()
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => start(async () => {
+        const result = await toggleWatchAction(offeringId)
+        if (!result.error) setWatching(result.watching)
+      })}
+      className="flex items-center gap-1.5 text-[12px] text-ink-secondary hover:text-accent"
+    >
+      <Bookmark className={`size-3.5 ${watching ? 'fill-accent text-accent' : ''}`} />
+      {watching ? 'On your watchlist' : 'Keep this for later'}
+    </button>
   )
 }
 

@@ -148,6 +148,8 @@ export interface Deal {
   target_close_date: ISODate | null
   narrative: string | null
   is_demo: boolean
+  /** Which catalogue this belongs to. Absent means the live one. */
+  environment?: 'live' | 'demo'
   distributed_at: ISODate | null
   created_at: ISODate
   updated_at: ISODate

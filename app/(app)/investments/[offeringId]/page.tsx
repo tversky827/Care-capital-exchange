@@ -26,6 +26,7 @@ import { ndaState } from '@/services/equity/nda'
 import { accountFor } from '@/services/accounts/accounts'
 import { spendableFor } from '@/services/accounts/ledger'
 import { currentEnvironment } from '@/lib/environment'
+import { catalogueFor, inCatalogue } from '@/lib/catalogue'
 import { accountFor as sandboxAccountFor } from '@/services/practice/accounts'
 import { balanceFor as sandboxBalanceFor } from '@/services/practice/ledger'
 import { positionIn } from '@/services/practice/investing'
@@ -59,9 +60,20 @@ export default async function OfferingPage({
   const actor = await requireActor()
   const store = await db()
 
+  // Which environment this reader is in decides which ticket they get and
+  // which catalogue they may read. Resolved from the signed cookie, never from
+  // anything on the page.
+  const environment = await currentEnvironment(actor.user.id)
+
   const offering = await store.findById('offerings', offeringId)
   if (!offering) notFound()
   if (!canViewOffering(subjectOf(actor), offering)) notFound()
+  // A raise from the other catalogue does not exist as far as this reader is
+  // concerned. Guarding only the listing would leave every fictional raise
+  // readable in the live product by anyone who had its URL — and a person
+  // reading invented figures without the word "demonstration" anywhere on the
+  // page is the failure this split exists to prevent.
+  if (!inCatalogue(offering, catalogueFor(environment))) notFound()
 
   // Everything below the teaser comes out of the operator's own record, so
   // nothing below the teaser is loaded until the agreement is signed. Gating
@@ -84,12 +96,6 @@ export default async function OfferingPage({
     ])
     : [null, null, [], [], []]
 
-  // Which environment this reader is in decides which ticket they get, and it
-  // is resolved from the signed cookie rather than from anything on the page.
-  // Everything above this line — the record, the analysis, the documents, the
-  // access ladder — is identical in all three, which is the point.
-  const environment = await currentEnvironment(actor.user.id)
-
   // What the ticket needs: whether they may invest, how much cash is actually
   // spendable right now, what they already hold here, and what they will be
   // asked to acknowledge. All of it is loaded server-side; the ticket computes
@@ -102,15 +108,20 @@ export default async function OfferingPage({
   let disclosures: { id: string; title: string }[] = []
   let sandboxCents = 0
   let sandboxHeldCents: number | null = null
+  let sandboxWatching = false
   if (environment !== 'live' && nda.accepted) {
     const sandbox = await sandboxAccountFor(actor, environment)
     if (sandbox) {
-      const [balance, held] = await Promise.all([
+      const [balance, held, watch] = await Promise.all([
         sandboxBalanceFor(sandbox.id),
         positionIn(sandbox.id, offeringId),
+        store.selectOne('practice_watchlist', {
+          where: { account_id: sandbox.id, offering_id: offeringId },
+        }),
       ])
       sandboxCents = balance
       sandboxHeldCents = held?.invested_cents ?? null
+      sandboxWatching = watch !== null
     }
   }
 
@@ -473,6 +484,7 @@ export default async function OfferingPage({
               heldCents={sandboxHeldCents}
               holdYears={terms?.target_hold_months ? Math.round(terms.target_hold_months / 12) : null}
               structure={terms?.capital_position === 'preferred_equity' ? 'Preferred equity' : 'Common equity'}
+              watching={sandboxWatching}
             />
           ) : (
           <InvestmentTicket

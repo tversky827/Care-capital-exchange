@@ -6,11 +6,13 @@ import { requireActor } from '@/lib/auth/session'
 import { isAvailable } from '@/lib/flags'
 import { cents, format, formatWhole } from '@/lib/money'
 import { currentEnvironment } from '@/lib/environment'
+import { catalogueFor } from '@/lib/catalogue'
 import { ensureAccount, activityFor } from '@/services/practice/accounts'
 import { portfolioFor, diversification } from '@/services/practice/portfolio'
 import { searchOfferings } from '@/services/equity/matching'
 import { OfferingCard } from '@/components/equity/offering-card'
 import { Alert, Button, Card, CardBody, PageHeader, Section } from '@/components/ui/primitives'
+import { Graduate } from '../graduate'
 import { formatDate, formatPercent } from '@/lib/utils/format'
 
 export const metadata: Metadata = { title: 'Sandbox' }
@@ -44,7 +46,7 @@ export default async function SandboxHomePage() {
 
   const held = new Set(portfolio.holdings.map((row) => row.position.offering_id))
   const open = actor.investor
-    ? (await searchOfferings(actor.investor.id, { status: 'live' }))
+    ? (await searchOfferings(actor.investor.id, { status: 'live' }, catalogueFor(environment)))
       .filter((row) => !held.has(row.offering.id))
       .slice(0, 3)
     : []
@@ -178,6 +180,8 @@ export default async function SandboxHomePage() {
               </p>
             </CardBody>
           </Section>
+
+          <Graduate holdings={portfolio.holdings.length} />
 
           <Section
             title="What you have done"

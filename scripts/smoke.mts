@@ -237,6 +237,9 @@ async function main(): Promise<void> {
       // Next reports an in-app redirect as a 200 once the shell has streamed,
       // so the assertion is that the sandbox's own content is absent.
       { path: '/sandbox/home', allow: [200, 307, 302], absent: 'Virtual cash' },
+      { path: '/sandbox/scenario', allow: [200, 307, 302], absent: 'Change an assumption' },
+      { path: '/sandbox/learn', allow: [200, 307, 302], absent: 'things tried' },
+      { path: '/sandbox/present', allow: [200, 307, 302], absent: 'Start with what is open' },
       { path: '/investor/dashboard', expect: 'Portfolio overview' },
       { path: '/investments', expect: 'Invest in healthcare properties' },
       { path: '/investor/opportunities', expect: 'Opportunities for you' },
@@ -273,6 +276,7 @@ async function main(): Promise<void> {
     { path: '/admin/audit', expect: 'udit' },
     { path: '/admin/billing', expect: 'illing' },
     { path: '/admin/benchmarks', expect: 'enchmark' },
+    { path: '/admin/sandbox', expect: 'Sandbox usage' },
   ])
 
   if (failures > 0) {

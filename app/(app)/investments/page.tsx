@@ -1,4 +1,6 @@
 import { requireActor } from '@/lib/auth/session'
+import { currentEnvironment } from '@/lib/environment'
+import { catalogueFor } from '@/lib/catalogue'
 import { isAvailable } from '@/lib/flags'
 import { OfferingCard } from '@/components/equity/offering-card'
 import { Alert, EmptyState, PageHeader } from '@/components/ui/primitives'
@@ -31,6 +33,9 @@ export default async function InvestmentsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const actor = await requireActor()
+  // Which catalogue this reader sees, decided by the signed environment
+  // cookie. A fictional raise must never appear in the real marketplace.
+  const catalogue = catalogueFor(await currentEnvironment(actor.user.id))
   if (!isAvailable('EQUITY_MARKETPLACE_ENABLED')) {
     return (
       <Alert tone="neutral" title="The equity marketplace is not enabled">
@@ -58,8 +63,8 @@ export default async function InvestmentsPage({
 
   const investorId = actor.investor?.id ?? null
   const [rows, unfiltered] = await Promise.all([
-    searchOfferings(investorId, search),
-    searchOfferings(investorId, { status: search.status }),
+    searchOfferings(investorId, search, catalogue),
+    searchOfferings(investorId, { status: search.status }, catalogue),
   ])
 
   // Ordered by fit where the viewer is an investor with preferences set, and by

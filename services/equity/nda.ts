@@ -1,5 +1,6 @@
 import 'server-only'
 import { db } from '@/db'
+import type { Catalogue } from '@/lib/catalogue'
 import { authorize } from '@/lib/policy'
 import { CURRENT_NDA } from '@/lib/equity/nda'
 import { recordAudit } from '../audit'
@@ -24,8 +25,21 @@ import type { NdaAcceptance } from '@/types/equity'
  *     in the audit log rather than gated by consent.
  */
 
-/** Whether this actor needs to accept an NDA before seeing offering detail. */
-export function ndaApplies(actor: Actor, offeringCompanyId: string): boolean {
+/**
+ * Whether this actor needs to accept an NDA before seeing offering detail.
+ *
+ * A demonstration raise is exempt, and the reason is not convenience. The
+ * agreement is a promise not to disclose an operator's confidential financial
+ * information; a fictional operator has none, so asking a presenter to sign
+ * one mid-demonstration would be asking them to promise nothing to nobody, and
+ * would teach whoever is watching that the agreement is a formality.
+ *
+ * Practice mode keeps it. There the information is a real operator's, the
+ * confidentiality is real, and signing it is part of the workflow a person is
+ * there to learn.
+ */
+export function ndaApplies(actor: Actor, offeringCompanyId: string, catalogue: Catalogue = 'live'): boolean {
+  if (catalogue === 'demo') return false
   if (actor.isAdmin) return false
   return actor.company.id !== offeringCompanyId
 }
@@ -50,7 +64,7 @@ export interface NdaState {
 
 export async function ndaState(actor: Actor, offeringId: string): Promise<NdaState> {
   const offering = await requireOffering(offeringId)
-  if (!ndaApplies(actor, offering.company_id)) {
+  if (!ndaApplies(actor, offering.company_id, offering.environment ?? 'live')) {
     return { required: false, accepted: true, acceptance: null }
   }
   const acceptance = await ndaFor(actor, offeringId)

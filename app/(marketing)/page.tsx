@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, CheckCircle2, FlaskConical } from 'lucide-react'
 import { Badge, Button, Card } from '@/components/ui/primitives'
 import { formatCurrency, formatPercent } from '@/lib/utils/format'
 
@@ -59,6 +59,29 @@ export default function HomePage() {
               <Link href="/for-borrowers">
                 <Button size="lg">I run a facility</Button>
               </Link>
+            </div>
+
+            {/* The sandbox, offered second rather than first. Somebody who
+                wants to invest should not have to walk past a practice mode to
+                do it, and somebody who is not ready will take the offer when
+                they see it. */}
+            <div className="mt-6 border-t border-line pt-5">
+              <p className="text-[13px] font-semibold text-ink">See it in action first</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
+                Explore real opportunities, analyse the deals and build a portfolio with virtual
+                money. Nothing you do creates an investment or a financial obligation.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Link href="/signup?intent=invest">
+                  <Button className="gap-1.5">
+                    <FlaskConical className="size-3.5" />
+                    Try practice investing
+                  </Button>
+                </Link>
+                <span className="text-[12px] text-ink-muted">
+                  Create an account, then pick <strong className="font-medium text-ink-secondary">Demo &amp; practice</strong>.
+                </span>
+              </div>
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-ink-muted">
               Private investments are illiquid, returns are projected rather than promised, and you

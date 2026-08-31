@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { requireActor } from '@/lib/auth/session'
+import { currentEnvironment } from '@/lib/environment'
+import { catalogueFor } from '@/lib/catalogue'
 import { assetNoun, stateName } from '@/lib/deal/display'
 import { formatCurrency, formatPercent, formatRatio, titleize } from '@/lib/utils/format'
 import { Alert, CardBody, EmptyState, PageHeader, Section, Table, Td, Th, Tr } from '@/components/ui/primitives'
@@ -23,6 +25,9 @@ export default async function ComparePage({
   searchParams: Promise<{ ids?: string }>
 }) {
   const actor = await requireActor()
+  // Which catalogue this reader sees, decided by the signed environment
+  // cookie. A fictional raise must never appear in the real marketplace.
+  const catalogue = catalogueFor(await currentEnvironment(actor.user.id))
   const { ids } = await searchParams
   const wanted = (ids ?? '').split(',').filter(Boolean).slice(0, 4)
 
@@ -37,7 +42,7 @@ export default async function ComparePage({
   }
 
   const store = await db()
-  const all = await searchOfferings(actor.investor?.id ?? null, { status: 'all' })
+  const all = await searchOfferings(actor.investor?.id ?? null, { status: 'all' }, catalogue)
   const rows = wanted
     .map((id) => all.find((row) => row.offering.id === id))
     .filter((row): row is NonNullable<typeof row> => Boolean(row))

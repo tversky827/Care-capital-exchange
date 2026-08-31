@@ -103,10 +103,14 @@ async function offeringReleasesDocument(actor: Actor, document: DocumentRecord):
     const offering = await store.findById('offerings', entry.offering_id)
     if (!offering || offering.deal_id !== document.deal_id) continue
 
-    const signed = await store.select('nda_acceptances', {
-      where: { offering_id: offering.id, company_id: actor.company.id, nda_version: CURRENT_NDA.version },
-    })
-    if (signed.length === 0) continue
+    // A demonstration raise has no confidential information to protect, so no
+    // agreement gates it. Every other raise does.
+    if ((offering.environment ?? 'live') !== 'demo') {
+      const signed = await store.select('nda_acceptances', {
+        where: { offering_id: offering.id, company_id: actor.company.id, nda_version: CURRENT_NDA.version },
+      })
+      if (signed.length === 0) continue
+    }
 
     const interest = actor.investor
       ? await store.selectOne('investment_interests', {

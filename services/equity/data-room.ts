@@ -122,7 +122,8 @@ export async function dataRoomFor(actor: Actor, offeringId: string): Promise<Dat
   // The access ladder decides which documents an engagement has earned. The
   // NDA decides whether any of them may be shown at all, and it is checked
   // here rather than only in the page so a direct call cannot step around it.
-  if (ndaApplies(actor, offering.company_id) && !(await ndaFor(actor, offeringId))) return []
+  const catalogue = offering.environment ?? 'live'
+  if (ndaApplies(actor, offering.company_id, catalogue) && !(await ndaFor(actor, offeringId))) return []
 
   const [entries, stage] = await Promise.all([
     store.select('offering_documents', {

@@ -1,5 +1,6 @@
 import 'server-only'
 import { db } from '@/db'
+import { inCatalogue, type Catalogue } from '@/lib/catalogue'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { scoreMatch, type MatchInput } from '@/lib/equity/matching'
 import { checkEligibility } from '@/lib/equity/eligibility'
@@ -111,7 +112,10 @@ export async function computeMatchesForOffering(offeringId: string): Promise<Inv
 /** Recomputes one investor's fit across every published offering. */
 export async function computeMatchesForInvestor(investorId: string): Promise<InvestorMatch[]> {
   const store = await db()
-  const live = await store.select('offerings', { where: { status: 'live' } })
+  // Matching runs against the live catalogue only. A demonstration raise is
+  // not something anybody should be matched to.
+  const live = (await store.select('offerings', { where: { status: 'live' } }))
+    .filter((offering) => inCatalogue(offering, 'live'))
   const results: InvestorMatch[] = []
   for (const offering of live) {
     const matches = await computeMatchesForOffering(offering.id)
@@ -238,10 +242,18 @@ export interface SearchRow {
 export async function searchOfferings(
   investorId: string | null,
   search: OfferingSearch = {},
+  /**
+   * Which catalogue to read. Defaults to the live one, so a caller that has
+   * never heard of the demonstration catalogue cannot accidentally surface it
+   * — a fictional raise appearing in the real marketplace is the one failure
+   * this whole split exists to prevent.
+   */
+  catalogue: Catalogue = 'live',
 ): Promise<SearchRow[]> {
   const store = await db()
   const all = await store.select('offerings', { orderBy: { field: 'published_at', dir: 'desc' } })
   const visible = all.filter((offering) => {
+    if (!inCatalogue(offering, catalogue)) return false
     if (search.status === 'all') {
       return ['live', 'paused', 'fully_subscribed', 'closed'].includes(offering.status)
     }

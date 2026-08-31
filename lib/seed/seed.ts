@@ -572,4 +572,20 @@ async function seed(store: Store): Promise<void> {
   // processed, so an investor sees the same documents and figures a lender does.
   const { seedEquityDemo } = await import('./equity-seed')
   await seedEquityDemo(store, hashPassword)
+
+  // --- The demonstration catalogue -----------------------------------------
+  // A second, entirely fictional world, reachable only from demonstration
+  // mode. Runs after everything else because it needs an administrator to
+  // publish its raises, and because a failure here should not take the live
+  // catalogue down with it — a deployment with no demonstration world is
+  // usable; one with no marketplace is not.
+  try {
+    const { seedDemoCatalogue } = await import('./demo-catalogue')
+    const built = await seedDemoCatalogue(store, hashPassword, DEMO_PASSWORD)
+    console.log(
+      `[seed] demonstration catalogue: ${built.deals} properties, ${built.facilities} facilities, ${built.offerings} raises`,
+    )
+  } catch (error) {
+    console.error('[seed] demonstration catalogue failed', error)
+  }
 }

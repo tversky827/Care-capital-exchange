@@ -46,6 +46,8 @@ export type ComplianceStatus =
  * records what the sponsor asserts and what a reviewer has cleared.
  */
 export interface Offering {
+  /** Which catalogue this raise belongs to. Absent means the live one. */
+  environment?: 'live' | 'demo'
   id: UUID
   deal_id: UUID
   company_id: UUID

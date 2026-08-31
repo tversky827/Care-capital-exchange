@@ -2,13 +2,16 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
 import { isAvailable } from '@/lib/flags'
 import { format, parseAmount } from '@/lib/money'
 import {
   currentEnvironment, enterEnvironment, leaveEnvironment, type SandboxEnvironment,
 } from '@/lib/environment'
-import { addCash, ensureAccount, resetAccount, withdrawCash, PracticeError } from '@/services/practice/accounts'
+import {
+  addCash, ensureAccount, record as recordActivity, resetAccount, withdrawCash, PracticeError,
+} from '@/services/practice/accounts'
 import { invest, simulateDistribution, simulateExit } from '@/services/practice/investing'
 import type { ActionState } from '@/app/(app)/deals/actions'
 
@@ -138,4 +141,40 @@ export async function resetSandboxAction(): Promise<void> {
   await resetAccount(actor, environment)
   revalidatePath('/sandbox', 'layout')
   redirect('/sandbox/home')
+}
+
+/**
+ * Keeping a raise to come back to.
+ *
+ * The one thing in the sandbox a person may write freely: it holds no money
+ * and nothing is derived from it. Still private — no operator is told that
+ * somebody is watching them in a practice account, because that would turn the
+ * sandbox into a channel for signalling interest and start eroding the promise
+ * that nothing here creates an obligation.
+ */
+export async function toggleWatchAction(offeringId: string): Promise<{ watching: boolean; error?: string }> {
+  try {
+    const { actor, environment } = await requireSandbox()
+    const account = await ensureAccount(actor, environment)
+    const store = await db()
+
+    const existing = await store.selectOne('practice_watchlist', {
+      where: { account_id: account.id, offering_id: offeringId },
+    })
+    if (existing) {
+      await store.remove('practice_watchlist', existing.id)
+      await recordActivity(account, 'watchlist_removed', 'Removed a raise from the watchlist.', offeringId)
+      revalidatePath('/sandbox', 'layout')
+      return { watching: false }
+    }
+
+    await store.insert('practice_watchlist', {
+      account_id: account.id, offering_id: offeringId, note: null,
+    } as never)
+    await recordActivity(account, 'watchlist_added', 'Added a raise to the watchlist.', offeringId)
+    revalidatePath('/sandbox', 'layout')
+    return { watching: true }
+  } catch (error) {
+    return { watching: false, ...(failure(error) as { error: string }) }
+  }
 }

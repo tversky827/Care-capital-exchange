@@ -603,13 +603,26 @@ describe('the boundary is structural, not a matter of discipline', () => {
     expect(offences).toEqual([])
   })
 
-  it('imports no production money service from the sandbox server actions', async () => {
-    const { readFileSync } = await import('node:fs')
+  it('imports no production money service anywhere under the sandbox routes', async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs')
     const { join } = await import('node:path')
-    const source = readFileSync(join(process.cwd(), 'app', '(app)', 'sandbox', 'actions.ts'), 'utf8')
-    for (const forbidden of FORBIDDEN) {
-      expect(source, `sandbox actions import ${forbidden}`).not.toContain(`from '${forbidden}'`)
+
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((entry) => {
+        const full = join(dir, entry)
+        return statSync(full).isDirectory()
+          ? walk(full)
+          : /\.tsx?$/.test(entry) ? [full] : []
+      })
+
+    const offences: string[] = []
+    for (const file of walk(join(process.cwd(), 'app', '(app)', 'sandbox'))) {
+      const source = readFileSync(file, 'utf8')
+      for (const forbidden of FORBIDDEN) {
+        if (source.includes(`from '${forbidden}'`)) offences.push(`${file} imports ${forbidden}`)
+      }
     }
+    expect(offences).toEqual([])
   })
 
   it('writes to no table outside the sandbox namespace', async () => {

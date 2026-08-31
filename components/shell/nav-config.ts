@@ -2,9 +2,9 @@
 
 import type { LucideIcon } from 'lucide-react'
 import {
-  Activity, BarChart3, Briefcase, Building2, Coins, FileText, FlaskConical, Gauge, Home,
-  LayoutDashboard, ListChecks, Receipt, Search, Settings, ShieldCheck, Store, Users, Wallet,
-  Workflow,
+  Activity, BarChart3, Briefcase, Building2, Coins, FileText, FlaskConical, Gauge, GraduationCap,
+  Home, LayoutDashboard, ListChecks, Presentation, Receipt, Search, Settings, ShieldCheck,
+  Sparkles, Store, Users, Wallet, Workflow,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -98,6 +98,7 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: '/admin/audit', label: 'Audit log', icon: Activity },
       { href: '/admin/billing', label: 'Billing', icon: Wallet },
       { href: '/admin/benchmarks', label: 'Benchmarks', icon: BarChart3 },
+      { href: '/admin/sandbox', label: 'Sandbox usage', icon: FlaskConical },
     ],
   },
 ]
@@ -181,6 +182,9 @@ export const SANDBOX_NAV: NavGroup[] = [
   {
     label: '',
     items: [
+      { href: '/sandbox/scenario', label: 'What if?', icon: Sparkles, prefix: true, short: 'What if' },
+      { href: '/sandbox/learn', label: 'Learn', icon: GraduationCap, prefix: true },
+      { href: '/sandbox/present', label: 'Presentation mode', icon: Presentation, short: 'Present' },
       { href: '/sandbox', label: 'Switch mode', icon: FlaskConical },
     ],
   },
