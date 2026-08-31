@@ -28,6 +28,7 @@ pipeline has processed, and a complete borrower-to-lender workflow.
 - [AI provider setup](#ai-provider-setup)
 - [Local development](#local-development)
 - [The equity marketplace](#the-equity-marketplace)
+- [The sandbox](#the-sandbox)
 - [Testing](#testing)
 - [Publishing a demo](#publishing-a-demo)
 - [Production deployment](#production-deployment)
@@ -249,6 +250,9 @@ AUTH_SECRET=<openssl rand -hex 32>
 | `supabase/migrations/0005_nda.sql` | Confidentiality agreements and their acceptances |
 | `supabase/migrations/0006_accounts.sql` | Investment accounts, the cash ledger, orders — with the ledger's immutability triggers |
 | `supabase/migrations/0007_accounts_rls.sql` | Row level security for the accounts tables. No account holder may write a ledger entry or an order |
+| `supabase/migrations/0008_sandbox.sql` | The sandbox: virtual-money accounts, an append-only ledger, positions and history, in their own tables |
+| `supabase/migrations/0009_sandbox_rls.sql` | Row level security for the sandbox. A practice portfolio is visible to its holder and to nobody else — not an operator, not an administrator |
+| `supabase/migrations/0010_catalogue.sql` | The demonstration catalogue: an `environment` column on deals and offerings, and a trigger keeping a raise in the same catalogue as its property |
 
 Apply in order:
 
@@ -445,6 +449,125 @@ advice.
 
 ---
 
+## The sandbox
+
+Three environments. The product is one product; what changes is which catalogue
+of opportunities a person is looking at and whose money moves.
+
+| | Catalogue | Money | Creates an obligation |
+| --- | --- | --- | --- |
+| **Live** | Real raises | Real account, regulated workflow | Yes |
+| **Practice** | **Real raises** | Virtual | No |
+| **Demonstration** | Fictional raises | Virtual | No |
+
+The deal page, the analysis, the risk score, the documents, the AI questions
+and the shape of the investment ticket are the same code in all three. That is
+the point: a person who has practised has practised on the actual product.
+
+Enter at `/sandbox`.
+
+### What makes it safe
+
+The isolation is **structural rather than conditional**. There is no
+`environment` column on the production ledger that a forgotten `where` clause
+could bypass — the sandbox has no row in the production ledger at all, and its
+services do not import the ones that own it. A sandbox write lands in a
+`practice_*` table or it fails; there is nowhere else for it to go.
+
+The environment is resolved from a signed cookie bound to the user id, on every
+call, and from nothing else. A request that says `environment=practice` is
+posting a string that nothing reads.
+
+Three tests hold that boundary mechanically rather than by discipline: no file
+under `services/practice` imports a production money service, no file under
+`app/(app)/sandbox` does either, and the set of tables those services write is
+asserted exactly. A behavioural test passes right up until somebody adds the
+import.
+
+Migration `0008` puts the rest in the database. The sandbox ledger is
+append-only — stronger than the production ledger's rule, which lets a status
+advance, because a virtual entry has no status to advance through. An entry
+cannot be zero, an idempotency key is unique per account, a row cannot claim an
+environment its account disagrees with, and one person holds one active account
+per sandbox. Every one of those has been verified to refuse against PostgreSQL 16.
+
+### The two catalogues
+
+`0010` adds an `environment` column to `deals` and `offerings`, defaulting to
+`live`. A trigger stops a raise being created against a property from the other
+catalogue.
+
+That is a weaker boundary than the ledger's, and deliberately: the risk here is
+a **read** leaking the wrong way, not a write moving money. The offering detail
+page refuses a cross-catalogue read as well as the listing — guarding the
+listing alone would leave every fictional raise readable by anyone holding its
+URL, with nothing on the page to say the figures were invented.
+
+Fictional raises are not anonymised and carry no confidentiality agreement.
+Both would protect a confidentiality that does not exist, and asking a
+presenter to sign one mid-demonstration teaches whoever is watching that the
+agreement is a formality. Practice mode keeps both: there the operator is real.
+
+### The demonstration catalogue
+
+Fifteen fictional portfolios across fifteen states — 53 facilities, eight
+operators, 135 documents. Generated from one seed value, so the same world
+appears every time; a presenter who rehearsed against one set of figures should
+not find different ones on the day.
+
+Two of the portfolios are genuinely difficult — thin coverage, heavy agency
+labour, census below market. A demonstration in which every deal looks good
+teaches the wrong thing about the asset class and about a product whose purpose
+is telling them apart.
+
+It is seeded through the ordinary services rather than by inserting rows, so
+the figures on a demonstration deal were extracted from generated documents by
+the same code that handles a real upload.
+
+### Routes
+
+| Route | What it is |
+| --- | --- |
+| `/sandbox` | The way in. Two doors, and the difference stated plainly |
+| `/sandbox/home` | The same shape as the live investor home, plus how spread the portfolio is |
+| `/sandbox/portfolio` | Holdings, with a button to advance a quarter or take one to its sale |
+| `/sandbox/cash` | Virtual cash, every movement, and the reset |
+| `/sandbox/scenario` | Six dials over the deterministic scenario engine |
+| `/sandbox/learn` | What you have tried, and the vocabulary for it |
+| `/sandbox/present` | A nine-step script for demonstrating the product live |
+| `/admin/sandbox` | Usage counts. Nothing identifying anybody |
+
+### What is simulated, and how
+
+Distributions run through the offering's **own waterfall** — the same
+`runWaterfall` the live product uses, against the raise's stated preferred rate
+and promote. Exits use the projection engine's exit figure scaled by ownership,
+which is the same number the offering page shows. Nothing in the sandbox is
+computed by a language model.
+
+Holdings are carried at cost and never marked up. The hypothetical rate is
+measured in **simulated quarters**, not wall-clock time — a person can simulate
+four quarters in thirty seconds — and it closes an unsold holding at cost,
+stating that assumption on the page.
+
+### What the sandbox deliberately does not do
+
+- A practice portfolio is **never** converted into a real one. Each holding
+  would be a decision taken again, with real money, against terms that may have
+  moved; presenting that as one button would misrepresent all of it.
+- No operator is ever told that somebody holds or watches their raise in a
+  practice account. That would turn the sandbox into a channel for signalling
+  interest and start eroding the promise that nothing here creates an
+  obligation.
+- The readiness checklist measures **activity, never performance**. A score
+  that rose when a simulated investment did well would teach that picking
+  winners in a simulation means something; it means nothing, because the
+  simulation runs on each sponsor's own assumptions. It is not a qualification
+  and has no effect on eligibility.
+
+
+---
+
 ## Testing
 
 ```bash
@@ -502,13 +625,14 @@ create a project and wait for it to finish provisioning.
 **2. Apply the schema.** In the Supabase dashboard open **SQL Editor**, paste
 each migration in `supabase/migrations/` in order — `0001_init.sql`,
 `0002_rls.sql`, `0003_equity.sql`, `0004_equity_rls.sql`, `0005_nda.sql`,
-`0006_accounts.sql`, `0007_accounts_rls.sql` — running each before pasting the
+`0006_accounts.sql`, `0007_accounts_rls.sql`, `0008_sandbox.sql`,
+`0009_sandbox_rls.sql`, `0010_catalogue.sql` — running each before pasting the
 next. Order matters: each row-level-security file depends on helper functions
 the file before it defines. `0002` also creates the private `deal-documents`
 storage bucket.
 
-All seven have been applied in order to a stock PostgreSQL 16 and produce 80
-tables, 164 row-level-security policies and 47 `updated_at` triggers, with no
+All ten have been applied in order to a stock PostgreSQL 16 and produce 87
+tables, 177 row-level-security policies and 49 `updated_at` triggers, with no
 table left without row-level security.
 
 **3. Collect four values** from **Project Settings → API**: the project URL,
