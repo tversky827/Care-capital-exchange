@@ -6,6 +6,7 @@ import { requireActor } from '@/lib/auth/session'
 import { isAvailable } from '@/lib/flags'
 import { cents, format, formatWhole } from '@/lib/money'
 import { currentEnvironment } from '@/lib/environment'
+import { isGuest } from '@/services/auth'
 import { catalogueFor } from '@/lib/catalogue'
 import { ensureAccount, activityFor } from '@/services/practice/accounts'
 import { portfolioFor, diversification } from '@/services/practice/portfolio'
@@ -181,7 +182,7 @@ export default async function SandboxHomePage() {
             </CardBody>
           </Section>
 
-          <Graduate holdings={portfolio.holdings.length} />
+          <Graduate holdings={portfolio.holdings.length} guest={isGuest(actor)} />
 
           <Section
             title="What you have done"

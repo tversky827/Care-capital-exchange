@@ -2,6 +2,7 @@ import 'server-only'
 import { db } from '@/db'
 import { authorize } from '@/lib/policy'
 import { isAvailable } from '@/lib/flags'
+import { isGuest } from '@/services/auth'
 import { cents, format, type Cents } from '@/lib/money'
 import { recordAudit } from '../audit'
 import { post } from './ledger'
@@ -74,6 +75,14 @@ export interface OpenAccountInput {
  */
 export async function openAccount(actor: Actor, input: OpenAccountInput): Promise<InvestorAccount> {
   authorize(isAvailable('INVESTOR_ACCOUNTS_ENABLED'), 'Investor accounts are not enabled.')
+  // A guest account is made by anybody who clicks a button on the public site.
+  // It may look at the demonstration and nothing else: an account created in
+  // one click by an unidentified visitor must not be able to open an
+  // investment account, whatever else is switched on.
+  authorize(
+    !isGuest(actor),
+    'Create an account before opening an investment account. The demonstration cannot.',
+  )
   authorize(
     actor.company.type === 'investor',
     'An investment account belongs to an investor organisation.',

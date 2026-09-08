@@ -30,6 +30,12 @@ export interface User {
   status: 'active' | 'suspended' | 'pending'
   title: string | null
   last_login_at: ISODate | null
+  /**
+   * Created on the spot so somebody could look at the product without signing
+   * up. Confined to the demonstration sandbox and refused by every live money
+   * path. Absent means an ordinary account.
+   */
+  is_guest?: boolean
   notification_preferences: NotificationPreferences
   created_at: ISODate
   updated_at: ISODate

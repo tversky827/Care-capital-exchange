@@ -5,6 +5,7 @@ import { requireActor } from '@/lib/auth/session'
 import { isAvailable } from '@/lib/flags'
 import { cents, format } from '@/lib/money'
 import { currentEnvironment } from '@/lib/environment'
+import { isGuest } from '@/services/auth'
 import { OPENING_BALANCE_CENTS } from '@/types/practice'
 import { Button, Card, CardBody } from '@/components/ui/primitives'
 import { enterSandboxAction } from './actions'
@@ -31,6 +32,11 @@ export default async function SandboxPage() {
 
   const environment = await currentEnvironment(actor.user.id)
   const demo = isAvailable('DEMO_MODE_ENABLED')
+  const guest = isGuest(actor)
+  // Practice reads the live catalogue, which is a real operator's figures
+  // released under a confidentiality agreement. An agreement signed by an
+  // unidentified guest protects nobody, so the door is shown and explained
+  // rather than hidden.
   const practice = isAvailable('PRACTICE_MODE_ENABLED')
   if (!demo && !practice) notFound()
 
@@ -77,6 +83,34 @@ export default async function SandboxPage() {
         ) : null}
 
         {practice ? (
+          guest ? (
+            <Card>
+              <CardBody className="flex h-full flex-col gap-4 p-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="size-5 text-ink-muted" />
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+                      Practice
+                    </span>
+                  </div>
+                  <h2 className="mt-2 text-[18px] font-semibold text-ink">Practise on the real ones</h2>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
+                    The actual marketplace — real raises, real financials, real documents — still
+                    with virtual money and still with no obligation.
+                  </p>
+                </div>
+                <p className="text-[12px] leading-relaxed text-ink-muted">
+                  This one needs an account. Real operators release their figures under a
+                  confidentiality agreement, and an agreement signed by a guest protects nobody.
+                </p>
+                <div className="mt-auto">
+                  <a href="/signup?intent=invest">
+                    <Button variant="secondary" className="w-full">Create an account</Button>
+                  </a>
+                </div>
+              </CardBody>
+            </Card>
+          ) : (
           <Door
             mode="practice"
             icon={<FlaskConical className="size-5 text-accent" />}
@@ -88,6 +122,7 @@ export default async function SandboxPage() {
             note="Nothing you do here creates an investment, a commitment or a financial obligation. No sponsor is told, no raise is affected, and no money can move."
             primary
           />
+          )
         ) : null}
       </div>
 

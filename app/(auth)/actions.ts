@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import {
-  AuthFailure, consumeMagicLink, establishSession, login, loginAsDemoUser, register,
+  AuthFailure, consumeMagicLink, establishSession, isIntent, login, loginAsDemoUser, register,
   requestMagicLink, type Intent,
 } from '@/services/auth'
 import { clearSessionCookie, getActor } from '@/lib/auth/session'
@@ -105,7 +105,7 @@ export async function registerAction(_prev: AuthState, formData: FormData): Prom
     companyName: String(formData.get('companyName') ?? ''),
     email: String(formData.get('email') ?? ''),
   }
-  if (!['find_financing', 'provide_financing', 'manage_for_clients'].includes(intent)) {
+  if (!isIntent(intent)) {
     return { error: 'Choose what you are here to do.', values }
   }
 
@@ -121,9 +121,17 @@ export async function registerAction(_prev: AuthState, formData: FormData): Prom
       intent,
     })
     await establishSession(token)
-    // A new lender lands on their lending box: it is the one thing they must
-    // complete before the platform can do anything useful for them.
-    destination = actor.isLender ? '/lender/box?welcome=1' : '/deals/new'
+    // The same routing signing in uses, so a new account and a returning one
+    // land in the same place. Written out separately, this sent every new
+    // investor to `/deals/new` — the page for adding a property, which is not
+    // a thing an investor has.
+    //
+    // The one departure: a new lender goes to their lending box, because it is
+    // the one thing they must complete before the platform can do anything
+    // useful for them.
+    destination = actor.isLender && debtMarketplaceEnabled()
+      ? '/lender/box?welcome=1'
+      : landingFor(actor)
   } catch (error) {
     return {
       error: error instanceof AuthFailure ? error.message : 'Registration failed. Please try again.',

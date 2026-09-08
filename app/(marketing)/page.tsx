@@ -66,21 +66,22 @@ export default function HomePage() {
                 do it, and somebody who is not ready will take the offer when
                 they see it. */}
             <div className="mt-6 border-t border-line pt-5">
-              <p className="text-[13px] font-semibold text-ink">See it in action first</p>
+              <p className="text-[13px] font-semibold text-ink">
+                Or see the whole thing first — no account needed
+              </p>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
-                Explore real opportunities, analyse the deals and build a portfolio with virtual
-                money. Nothing you do creates an investment or a financial obligation.
+                One press puts you inside the platform with virtual money. Browse the raises, read
+                the financials, invest, and watch what it would pay. Nothing you do creates an
+                investment or an obligation.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Link href="/signup?intent=invest">
+                <Link href="/try">
                   <Button className="gap-1.5">
                     <FlaskConical className="size-3.5" />
-                    Try practice investing
+                    See the demo
                   </Button>
                 </Link>
-                <span className="text-[12px] text-ink-muted">
-                  Create an account, then pick <strong className="font-medium text-ink-secondary">Demo &amp; practice</strong>.
-                </span>
+                <span className="text-[12px] text-ink-muted">No email, no card, nothing to install.</span>
               </div>
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-ink-muted">

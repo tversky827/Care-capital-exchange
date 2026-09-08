@@ -15,7 +15,7 @@ import { Card, CardBody } from '@/components/ui/primitives'
  * anybody for anything, and nothing done here shortens the process on the
  * other side.
  */
-export function Graduate({ holdings }: { holdings: number }) {
+export function Graduate({ holdings, guest = false }: { holdings: number; guest?: boolean }) {
   return (
     <Card className="border-accent-line">
       <CardBody className="space-y-3">
@@ -29,18 +29,20 @@ export function Graduate({ holdings }: { holdings: number }) {
           shortens it or counts towards it.
         </p>
         <p className="text-[12px] leading-relaxed text-ink-muted">
-          Your practice holdings stay here. They are not converted into real positions — each one
-          would be a decision taken again, with real money, against terms that may have moved.
+          {guest
+            ? 'This is a guest session, so it will not be here tomorrow. Nothing in it carries across to a real account.'
+            : 'Your practice holdings stay here. They are not converted into real positions — each one would be a decision taken again, with real money, against terms that may have moved.'}
         </p>
-        {/* Straight to the live investor home, which sends anyone without an
-            account to onboarding on its own. Checking here would mean a
+        {/* A guest has no account, so they are sent to make one. Everybody else
+            goes to the live investor home, which routes anyone without an
+            account to onboarding on its own — checking here would mean a
             sandbox page importing the production account service, and the
             boundary is worth more than one saved redirect. */}
         <Link
-          href="/investor"
+          href={guest ? '/signup?intent=invest' : '/investor'}
           className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent hover:underline"
         >
-          Open an investment account
+          {guest ? 'Create an account' : 'Open an investment account'}
           <ArrowRight className="size-3.5" />
         </Link>
       </CardBody>

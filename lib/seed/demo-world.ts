@@ -53,8 +53,18 @@ interface PortfolioSpec {
   occupancy: number
   agencyShare: number
   payer: { medicare: number; medicaid: number; managedCare: number; privatePay: number; other: number }
-  /** Price per bed. */
-  pricePerBed: number
+  /**
+   * The capitalisation rate the property is bought at.
+   *
+   * Price is derived from this and the operating income rather than set per
+   * bed, which is how these deals are actually priced — and which is what
+   * makes a stabilised building expensive and a turnaround cheap. Priced per
+   * bed instead, every portfolio came out at a 12% going-in cap, and with
+   * debt at 7% that positive leverage handed all fifteen a 25–30% return.
+   * A demonstration where the turnaround and the stabilised asset show the
+   * same number is a demonstration that the platform cannot tell them apart.
+   */
+  goingInCapPct: number
   leverage: number
   targetRaise: number
   minimum: number
@@ -77,7 +87,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 96_000, margin: 0.112, occupancy: 87, agencyShare: 0.041,
     payer: { medicare: 14, medicaid: 62, managedCare: 17, privatePay: 6, other: 1 },
-    pricePerBed: 74_000, leverage: 0.66,
+    goingInCapPct: 10.9, leverage: 0.66,
     targetRaise: 8_000_000, minimum: 10_000, holdYears: 5, targetIrrPct: 17.2,
     narrative: 'Four stabilised Cook County skilled nursing facilities acquired from a retiring owner-operator. The buyer operates eleven buildings in the state and intends to consolidate purchasing, reduce agency reliance and refinance at stabilisation.',
     status: 'ready',
@@ -96,7 +106,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 101_000, margin: 0.124, occupancy: 89, agencyShare: 0.028,
     payer: { medicare: 17, medicaid: 55, managedCare: 21, privatePay: 6, other: 1 },
-    pricePerBed: 82_000, leverage: 0.64,
+    goingInCapPct: 10.4, leverage: 0.64,
     targetRaise: 12_500_000, minimum: 25_000, holdYears: 6, targetIrrPct: 15.8,
     narrative: 'Six-facility Tampa Bay portfolio with above-market Medicare mix and a stable management team retained through the transaction. The seller is a regional operator exiting Florida to concentrate on its home state.',
     status: 'ready',
@@ -112,7 +122,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 94_000, margin: 0.137, occupancy: 91, agencyShare: 0.019,
     payer: { medicare: 19, medicaid: 51, managedCare: 22, privatePay: 7, other: 1 },
-    pricePerBed: 88_000, leverage: 0.62,
+    goingInCapPct: 10.0, leverage: 0.62,
     targetRaise: 5_500_000, minimum: 10_000, holdYears: 4, targetIrrPct: 18.1,
     narrative: 'Three newer San Antonio buildings clustered around the South Texas Medical Center, with referral relationships to two acute systems and the strongest star ratings in the portfolio.',
     status: 'ready',
@@ -128,7 +138,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 88_000, margin: 0.081, occupancy: 79, agencyShare: 0.094,
     payer: { medicare: 11, medicaid: 71, managedCare: 13, privatePay: 4, other: 1 },
-    pricePerBed: 52_000, leverage: 0.71,
+    goingInCapPct: 12.8, leverage: 0.71,
     targetRaise: 4_200_000, minimum: 10_000, holdYears: 5, targetIrrPct: 24.6,
     narrative: 'A genuine turnaround. Three central Ohio buildings running below break-even on agency labour that reached nine per cent of wages, with census twelve points under the market. The plan is a permanent-staffing programme first and a census recovery second; the return depends on both.',
     status: 'ready',
@@ -145,7 +155,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 92_000, margin: 0.129, occupancy: 88, agencyShare: 0.031,
     payer: { medicare: 16, medicaid: 58, managedCare: 19, privatePay: 6, other: 1 },
-    pricePerBed: 71_000, leverage: 0.65,
+    goingInCapPct: 10.8, leverage: 0.65,
     targetRaise: 6_400_000, minimum: 10_000, holdYears: 5, targetIrrPct: 16.9,
     narrative: 'Four Marion County and collar-county buildings under one licence holder, sold as part of a family estate settlement. Supplemental Medicaid payments in Indiana are a material part of the underwriting and are set out in full in the data room.',
     status: 'ready',
@@ -161,7 +171,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'refinance',
     revenuePerBed: 90_000, margin: 0.118, occupancy: 86, agencyShare: 0.038,
     payer: { medicare: 15, medicaid: 60, managedCare: 18, privatePay: 6, other: 1 },
-    pricePerBed: 68_000, leverage: 0.68,
+    goingInCapPct: 11.0, leverage: 0.68,
     targetRaise: 3_800_000, minimum: 10_000, holdYears: 5, targetIrrPct: 15.4,
     narrative: 'A recapitalisation rather than a purchase. The sponsor has operated these three buildings for nine years and is refinancing a maturing bridge facility while bringing in outside equity to fund a room-conversion programme.',
     status: 'ready',
@@ -178,7 +188,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 105_000, margin: 0.142, occupancy: 90, agencyShare: 0.022,
     payer: { medicare: 21, medicaid: 46, managedCare: 25, privatePay: 7, other: 1 },
-    pricePerBed: 96_000, leverage: 0.61,
+    goingInCapPct: 9.5, leverage: 0.61,
     targetRaise: 9_600_000, minimum: 25_000, holdYears: 5, targetIrrPct: 16.4,
     narrative: 'Four Maricopa County buildings with the strongest payer mix in the catalogue and a managed-care share that has grown every year for four years. Newer construction; capital expenditure is modelled at replacement level rather than catch-up.',
     status: 'ready',
@@ -194,7 +204,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 89_000, margin: 0.109, occupancy: 85, agencyShare: 0.047,
     payer: { medicare: 14, medicaid: 63, managedCare: 17, privatePay: 5, other: 1 },
-    pricePerBed: 66_000, leverage: 0.67,
+    goingInCapPct: 11.9, leverage: 0.67,
     targetRaise: 5_100_000, minimum: 10_000, holdYears: 5, targetIrrPct: 18.7,
     narrative: 'Three metro Atlanta buildings from a seller consolidating out of Georgia. Census recovered through the last two years but remains below the 2019 level, and the underwriting does not assume it returns there.',
     status: 'ready',
@@ -211,7 +221,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 93_000, margin: 0.126, occupancy: 88, agencyShare: 0.029,
     payer: { medicare: 17, medicaid: 56, managedCare: 20, privatePay: 6, other: 1 },
-    pricePerBed: 78_000, leverage: 0.64,
+    goingInCapPct: 10.6, leverage: 0.64,
     targetRaise: 6_900_000, minimum: 10_000, holdYears: 5, targetIrrPct: 16.1,
     narrative: 'Four buildings across the Charlotte metropolitan area, three of them performing and one requiring a licence remediation that is under way and disclosed in full. Certificate-of-need protection limits new supply in the market.',
     status: 'ready',
@@ -227,7 +237,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 97_000, margin: 0.134, occupancy: 90, agencyShare: 0.024,
     payer: { medicare: 19, medicaid: 52, managedCare: 22, privatePay: 6, other: 1 },
-    pricePerBed: 86_000, leverage: 0.63,
+    goingInCapPct: 10.1, leverage: 0.63,
     targetRaise: 5_800_000, minimum: 10_000, holdYears: 4, targetIrrPct: 17.6,
     narrative: 'Three Middle Tennessee buildings serving a metropolitan area adding population faster than it is adding skilled nursing beds. The sponsor operates six facilities in the state and has closed four prior acquisitions.',
     status: 'ready',
@@ -243,7 +253,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 128_000, margin: 0.115, occupancy: 89, agencyShare: 0.052,
     payer: { medicare: 15, medicaid: 59, managedCare: 20, privatePay: 5, other: 1 },
-    pricePerBed: 112_000, leverage: 0.60,
+    goingInCapPct: 9.7, leverage: 0.60,
     targetRaise: 11_200_000, minimum: 25_000, holdYears: 6, targetIrrPct: 14.8,
     narrative: 'Three Sacramento-area buildings. California revenue per bed is the highest in the catalogue and so is the cost base; the underwriting reflects state minimum-staffing requirements and the wage schedule that goes with them.',
     status: 'ready',
@@ -260,7 +270,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 91_000, margin: 0.095, occupancy: 83, agencyShare: 0.068,
     payer: { medicare: 13, medicaid: 66, managedCare: 16, privatePay: 4, other: 1 },
-    pricePerBed: 58_000, leverage: 0.69,
+    goingInCapPct: 12.6, leverage: 0.69,
     targetRaise: 5_600_000, minimum: 10_000, holdYears: 6, targetIrrPct: 21.3,
     narrative: 'Four Allegheny County buildings with an ageing physical plant and the second-heaviest agency labour in the catalogue. Two require substantial capital expenditure in the first eighteen months, which is funded from the raise rather than from operations.',
     status: 'ready',
@@ -276,7 +286,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 118_000, margin: 0.121, occupancy: 91, agencyShare: 0.044,
     payer: { medicare: 18, medicaid: 57, managedCare: 20, privatePay: 4, other: 1 },
-    pricePerBed: 104_000, leverage: 0.62,
+    goingInCapPct: 9.9, leverage: 0.62,
     targetRaise: 7_400_000, minimum: 25_000, holdYears: 5, targetIrrPct: 15.2,
     narrative: 'Three central Massachusetts buildings in a certificate-of-need state with effectively no new construction. Occupancy is the highest in the catalogue; the return depends on rate growth and cost control rather than on filling beds.',
     status: 'ready',
@@ -292,7 +302,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 87_000, margin: 0.113, occupancy: 86, agencyShare: 0.036,
     payer: { medicare: 15, medicaid: 61, managedCare: 18, privatePay: 5, other: 1 },
-    pricePerBed: 64_000, leverage: 0.66,
+    goingInCapPct: 11.2, leverage: 0.66,
     targetRaise: 4_600_000, minimum: 10_000, holdYears: 5, targetIrrPct: 17.9,
     narrative: 'Three St. Louis County buildings acquired alongside the operating companies. The sponsor already runs four facilities within thirty miles, so the regional management overhead is absorbed rather than added.',
     status: 'ready',
@@ -308,7 +318,7 @@ const PORTFOLIOS: PortfolioSpec[] = [
     assetType: 'snf', transactionType: 'acquisition',
     revenuePerBed: 82_000, margin: 0.104, occupancy: 84, agencyShare: 0.042,
     payer: { medicare: 14, medicaid: 64, managedCare: 16, privatePay: 5, other: 1 },
-    pricePerBed: 54_000, leverage: 0.68,
+    goingInCapPct: 12.2, leverage: 0.68,
     targetRaise: 3_200_000, minimum: 10_000, holdYears: 5, targetIrrPct: 19.4,
     narrative: 'Three Oklahoma buildings at the smallest scale in the catalogue, which is the point of including it: the fixed cost of regional management falls on fewer beds, and the underwriting shows what that does to the margin.',
     status: 'ready',
@@ -490,7 +500,12 @@ export function demoDealFixtures(): (DealFixture & { spec: PortfolioSpec })[] {
   return PORTFOLIOS.map((spec) => {
     const beds = spec.facilities.reduce((total, facility) => total + facility.beds, 0)
     const periods = periodsFor(spec, random)
-    const price = Math.round((beds * spec.pricePerBed) / 10_000) * 10_000
+    // What the buyer is paying for: the trailing operating income, capitalised
+    // at the rate this asset trades at. The 1.023 matches the growth the
+    // trailing-twelve-months period applies, so the price is against the
+    // income a buyer would actually underwrite rather than last year's.
+    const trailingEbitda = Math.round(periods[periods.length - 1]!.ebitda * 1.023)
+    const price = Math.round((trailingEbitda / (spec.goingInCapPct / 100)) / 10_000) * 10_000
     const financing = Math.round((price * spec.leverage) / 10_000) * 10_000
     const primary = spec.facilities[0]!
 

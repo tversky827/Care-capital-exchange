@@ -8,6 +8,7 @@ const NAV = [
   { href: '/for-borrowers', label: 'For operators' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/about', label: 'About' },
+  { href: '/try', label: 'See the demo' },
 ]
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {

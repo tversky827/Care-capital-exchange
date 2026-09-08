@@ -4,8 +4,11 @@ import { uploadDocument } from '@/services/documents'
 import { processDocument } from '@/services/extraction'
 import { createDeal } from '@/services/deals'
 import { createOffering, publishOffering } from '@/services/equity/offerings'
+import { projectOffering } from '@/services/equity/analysis'
+import { buildSnapshot } from '@/lib/deal/snapshot'
 import { round } from '@/lib/finance/calculations'
 import { documentsFor } from './documents'
+import { publishDealDocuments } from './equity-seed'
 import { demoDealFixtures, DEMO_OPERATORS } from './demo-world'
 import type { PeriodFixture } from './fixtures'
 import type { Company, Deal, User } from '@/types'
@@ -217,6 +220,23 @@ export async function seedDemoCatalogue(
     if (!actor) continue
 
     const spec = fixture.spec
+
+    // The exit assumption, derived rather than asserted.
+    //
+    // A flat exit cap rate across fifteen portfolios means some of them are
+    // modelled as selling at a lower cap than they were bought at, which is
+    // cap-rate compression — an assumption that manufactures return out of
+    // nothing and is the first thing an experienced investor looks for. Each
+    // raise here exits a quarter-point ABOVE its own going-in cap, so the
+    // return has to come from operations and from paying the debt down.
+    const snapshot = await buildSnapshot(deal.id)
+    const basis = snapshot?.summary.valueBasis ?? null
+    const noi = snapshot?.summary.noi ?? null
+    const goingInCapPct = basis && basis > 0 && noi ? (noi / basis) * 100 : null
+    const exitCapRatePct = goingInCapPct === null
+      ? 11.5
+      : round(Math.max(goingInCapPct + 0.25, 9), 2)
+
     const offering = await createOffering(actor, deal.id, {
       name: `${spec.name} Equity`,
       offering_type: 'reg_d_506b',
@@ -238,7 +258,7 @@ export async function seedDemoCatalogue(
         disposition_fee_pct: 0.01,
         assumptions: {
           hold_years: spec.holdYears,
-          exit_cap_rate_pct: 11.5,
+          exit_cap_rate_pct: exitCapRatePct,
           exit_multiple_of_ebitda: null,
           revenue_growth_pct: 3,
           expense_growth_pct: 2.8,
@@ -259,6 +279,22 @@ export async function seedDemoCatalogue(
       await publishOffering(reviewer, offering.id).catch(() => undefined)
       // Publishing writes the row again, so the catalogue is restated after it.
       await store.update('offerings', offering.id, { environment: 'demo' } as never)
+
+      // The data room. Uploading a document to the property does not put it in
+      // front of an investor — the raise has to release it, at an access
+      // level. Without this the demonstration had 135 documents nobody could
+      // open, which is worse than having none: the deal page showed an empty
+      // data room on a raise whose every figure came out of one.
+      //
+      // Released one tier lower than the live catalogue, because a fictional
+      // operator has nothing to protect and the whole point of showing this
+      // world is that somebody can open the documents.
+      await publishDealDocuments(store, offering.id, deal.id)
+      await store.updateWhere(
+        'offering_documents',
+        { offering_id: offering.id },
+        { access_level: 'public_teaser' } as never,
+      )
       // A raise with nothing in it looks like a raise nobody wanted. Committed
       // capital is set directly because there are no demonstration investors
       // behind it — and stating that here is better than inventing a hundred
@@ -266,6 +302,28 @@ export async function seedDemoCatalogue(
       await store.update('offerings', offering.id, {
         committed_amount: Math.round(spec.targetRaise * (0.18 + (spec.targetIrrPct % 5) / 20)),
       } as Partial<Offering>)
+
+      // The sponsor's stated target, taken from the engine that will render
+      // the projection rather than from the fixture.
+      //
+      // A demonstration whose header says 17.2% while the panel beneath it
+      // says 30.4% has lost the room: the first thing anybody does with a
+      // number on a screen is check it against the other number on the same
+      // screen. The stated target is what a sponsor derives from their own
+      // model, so this derives it the same way.
+      const projected = await projectOffering(offering.id)
+      if (projected && projected.insufficientData === null && projected.irrPct !== null) {
+        const terms = await store.selectOne('offering_terms', { where: { offering_id: offering.id } })
+        if (terms) {
+          await store.update('offering_terms', terms.id, {
+            target_irr_pct: round(projected.irrPct, 1),
+            target_equity_multiple: projected.equityMultiple === null
+              ? null : round(projected.equityMultiple, 2),
+            target_cash_on_cash_pct: projected.averageCashOnCashPct === null
+              ? null : round(projected.averageCashOnCashPct, 1),
+          } as never)
+        }
+      }
       offerings++
     }
   }

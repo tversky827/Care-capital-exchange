@@ -253,6 +253,7 @@ AUTH_SECRET=<openssl rand -hex 32>
 | `supabase/migrations/0008_sandbox.sql` | The sandbox: virtual-money accounts, an append-only ledger, positions and history, in their own tables |
 | `supabase/migrations/0009_sandbox_rls.sql` | Row level security for the sandbox. A practice portfolio is visible to its holder and to nobody else — not an operator, not an administrator |
 | `supabase/migrations/0010_catalogue.sql` | The demonstration catalogue: an `environment` column on deals and offerings, and a trigger keeping a raise in the same catalogue as its property |
+| `supabase/migrations/0011_guests.sql` | Guest accounts for the account-free demonstration, and the constraint that a guest never has a password |
 
 Apply in order:
 
@@ -464,7 +465,28 @@ The deal page, the analysis, the risk score, the documents, the AI questions
 and the shape of the investment ticket are the same code in all three. That is
 the point: a person who has practised has practised on the actual product.
 
-Enter at `/sandbox`.
+Enter at `/sandbox`, or at **`/try`** with no account at all.
+
+### The demonstration without an account
+
+`/try` is public. One press creates a guest — its own user, organisation and
+investor profile, so the sandbox it gets is genuinely private — signs it in,
+and drops it into the demonstration with $250,000 of virtual money.
+
+What a guest may do is bounded rather than trusted:
+
+- **No password.** Nothing can sign into a guest account through the ordinary
+  form; the session cookie is the only way back to it. A database constraint
+  enforces this as well as the service.
+- **Demonstration only.** Practice reads the live catalogue, which is a real
+  operator's figures released under a confidentiality agreement. An agreement
+  signed by an unidentified guest protects nobody, so the practice door
+  explains itself and asks for an account.
+- **No live money path.** `openAccount` refuses a guest outright. An account
+  anybody on the internet can create in one press must not be able to open an
+  investment account, whatever else is switched on.
+- **Capped.** `GUEST_DEMO_ENABLED` is its own flag, because this is a public
+  account-creation endpoint, and `MAX_GUESTS` bounds it.
 
 ### What makes it safe
 
@@ -626,12 +648,12 @@ create a project and wait for it to finish provisioning.
 each migration in `supabase/migrations/` in order — `0001_init.sql`,
 `0002_rls.sql`, `0003_equity.sql`, `0004_equity_rls.sql`, `0005_nda.sql`,
 `0006_accounts.sql`, `0007_accounts_rls.sql`, `0008_sandbox.sql`,
-`0009_sandbox_rls.sql`, `0010_catalogue.sql` — running each before pasting the
-next. Order matters: each row-level-security file depends on helper functions
+`0009_sandbox_rls.sql`, `0010_catalogue.sql`, `0011_guests.sql` — running each
+before pasting the next. Order matters: each row-level-security file depends on helper functions
 the file before it defines. `0002` also creates the private `deal-documents`
 storage bucket.
 
-All ten have been applied in order to a stock PostgreSQL 16 and produce 87
+All eleven have been applied in order to a stock PostgreSQL 16 and produce 87
 tables, 177 row-level-security policies and 49 `updated_at` triggers, with no
 table left without row-level security.
 

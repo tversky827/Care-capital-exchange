@@ -8,6 +8,7 @@ import type { NavRole } from '@/components/shell/nav-config'
 import { DemoBanner } from '@/components/brand'
 import { EnvironmentBanner } from '@/components/shell/environment-banner'
 import { currentEnvironment } from '@/lib/environment'
+import { isGuest } from '@/services/auth'
 
 /**
  * Authenticated shell.
@@ -31,13 +32,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Resolved from the signed cookie, not from anything the page was asked for.
   const environment = await currentEnvironment(actor.user.id)
+  const guest = isGuest(actor)
 
   return (
     <div className="flex min-h-screen bg-canvas">
       <Sidebar role={role} debtMarketplace={debtMarketplace} sandbox={environment !== 'live'} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar actor={actor} />
-        <EnvironmentBanner environment={environment} />
+        <EnvironmentBanner environment={environment} guest={guest} />
         {/* The seeded-data notice is redundant once the sandbox names itself. */}
         {demoDeals > 0 && environment === 'live' ? <DemoBanner className="no-print" /> : null}
         <main className="min-w-0 flex-1 px-4 py-5 lg:px-6 lg:py-6">{children}</main>

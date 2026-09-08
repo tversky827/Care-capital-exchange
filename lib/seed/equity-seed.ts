@@ -1119,7 +1119,7 @@ async function seedWaterfall(store: Store, offeringId: string, promote: number):
  * Publishes a selection of the deal's real documents into the offering's data
  * room, at access levels that demonstrate the ladder.
  */
-async function publishDealDocuments(store: Store, offeringId: string, dealId: string): Promise<void> {
+export async function publishDealDocuments(store: Store, offeringId: string, dealId: string): Promise<void> {
   const documents = await store.select('documents', {
     where: { deal_id: dealId, deleted_at: { isNull: true } },
   })

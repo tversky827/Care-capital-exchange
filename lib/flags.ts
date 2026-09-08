@@ -93,6 +93,15 @@ export const FLAGS = {
   SANDBOX_ENABLED: true,
   /** A fictional catalogue, for showing the product to someone. */
   DEMO_MODE_ENABLED: true,
+  /**
+   * Anybody may start the demonstration without signing up.
+   *
+   * This is a public account-creation endpoint, which is why it is its own
+   * switch rather than riding on DEMO_MODE_ENABLED. A deployment that wants
+   * the demonstration for its own staff but not for the internet turns this
+   * off and leaves the rest on.
+   */
+  GUEST_DEMO_ENABLED: true,
   /** Virtual money against the real catalogue. */
   PRACTICE_MODE_ENABLED: true,
   /**
@@ -151,6 +160,7 @@ const REQUIRES: Partial<Record<FeatureFlag, FeatureFlag[]>> = {
   ],
   AUTO_INVEST_ENABLED: ['INVESTMENT_ORDERS_ENABLED'],
   DEMO_MODE_ENABLED: ['SANDBOX_ENABLED'],
+  GUEST_DEMO_ENABLED: ['SANDBOX_ENABLED', 'DEMO_MODE_ENABLED'],
   PRACTICE_MODE_ENABLED: ['SANDBOX_ENABLED'],
   PRACTICE_REAL_DEALS_ENABLED: ['SANDBOX_ENABLED', 'PRACTICE_MODE_ENABLED'],
   PRACTICE_VIRTUAL_MONEY_ENABLED: ['SANDBOX_ENABLED', 'PRACTICE_MODE_ENABLED'],

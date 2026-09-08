@@ -15,7 +15,13 @@ import { exitSandboxAction } from '@/app/(app)/sandbox/actions'
  * held by the database, not by a red bar — and a warning shown on every screen
  * is a warning nobody sees by the third one.
  */
-export function EnvironmentBanner({ environment }: { environment: Environment }) {
+export function EnvironmentBanner({
+  environment, guest = false,
+}: {
+  environment: Environment
+  /** True for an account created by the public one-click door. */
+  guest?: boolean
+}) {
   if (environment === 'live') return null
   const { label, detail } = ENVIRONMENT_LABELS[environment]
   const demo = environment === 'demo'
@@ -37,11 +43,20 @@ export function EnvironmentBanner({ environment }: { environment: Environment })
         <Link href="/sandbox/home" className="underline underline-offset-2">
           Sandbox home
         </Link>
-        <form action={exitSandboxAction}>
-          <button type="submit" className="underline underline-offset-2">
-            Leave {demo ? 'demo' : 'practice'}
-          </button>
-        </form>
+        {/* A guest has no account to leave to. Offering "leave" would drop
+            them into a signed-in product they are not signed in to, so the way
+            out is the way forward. */}
+        {guest ? (
+          <Link href="/signup?intent=invest" className="font-semibold underline underline-offset-2">
+            Create an account
+          </Link>
+        ) : (
+          <form action={exitSandboxAction}>
+            <button type="submit" className="underline underline-offset-2">
+              Leave {demo ? 'demo' : 'practice'}
+            </button>
+          </form>
+        )}
       </span>
     </div>
   )

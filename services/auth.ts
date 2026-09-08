@@ -1,4 +1,5 @@
 import 'server-only'
+import { randomUUID } from 'node:crypto'
 import { db } from '@/db'
 import { checkPasswordStrength, hashPassword, verifyPassword } from '@/lib/auth/password'
 import { createSessionToken, resolveActor, setSessionCookie, type Actor } from '@/lib/auth/session'
@@ -23,6 +24,22 @@ const INTENT_TO_ROLE: Record<Intent, { role: UserRole; companyType: CompanyType 
   find_financing: { role: 'borrower', companyType: 'borrower' },
   provide_financing: { role: 'lender', companyType: 'lender' },
   manage_for_clients: { role: 'broker', companyType: 'broker' },
+}
+
+/**
+ * The intents a registration may carry.
+ *
+ * Derived from the map above rather than written out a second time. The two
+ * had drifted: `invest` was added here when the investor product was built and
+ * not to the list the sign-up action validated against, so every investor
+ * registration was rejected with "Choose what you are here to do" while the
+ * form showed the choice already made. A restated list is a list that goes
+ * stale; this one cannot.
+ */
+export const INTENTS = Object.keys(INTENT_TO_ROLE) as Intent[]
+
+export function isIntent(value: string): value is Intent {
+  return (INTENTS as string[]).includes(value)
 }
 
 export class AuthFailure extends Error {
@@ -211,6 +228,96 @@ export async function loginAsDemoUser(email: string): Promise<{ actor: Actor; to
   if (!actor) throw new AuthFailure('Demo user could not be resolved.')
   await store.update('users', user.id, { last_login_at: new Date().toISOString() })
   return { actor, token: createSessionToken({ userId: user.id, companyId: membership.company_id }) }
+}
+
+/**
+ * The most guests this deployment will make.
+ *
+ * A public one-click account is a public account-creation endpoint, so it
+ * needs a ceiling. When it is reached the door says so rather than failing
+ * obscurely, and the operator can prune the old ones.
+ */
+export const MAX_GUESTS = 5_000
+
+export class GuestLimitReached extends AuthFailure {
+  constructor() {
+    super('The demonstration is busy right now. Create an account and you will get in straight away.')
+    this.name = 'GuestLimitReached'
+  }
+}
+
+/**
+ * Creates an account for somebody who has not signed up.
+ *
+ * Its own user, its own organisation and its own investor profile, so the
+ * sandbox it gets is genuinely private — a shared demonstration account would
+ * show one visitor's portfolio to the next.
+ *
+ * It has no password on purpose. Nothing can sign into it through the ordinary
+ * form, and the session cookie is the only way back to it. When that expires
+ * the account is unreachable, which is the right lifetime for something made
+ * by a click.
+ */
+export async function createGuest(): Promise<{ actor: Actor; token: string }> {
+  const store = await db()
+  if (await store.count('users', { where: { is_guest: true } }) >= MAX_GUESTS) {
+    throw new GuestLimitReached()
+  }
+
+  const handle = randomUUID().replace(/-/g, '').slice(0, 10)
+  const now = new Date().toISOString()
+
+  const user = await store.insert('users', {
+    email: `guest-${handle}@guest.carecapital.invalid`,
+    full_name: 'Guest',
+    phone: null,
+    role: 'investor',
+    // No password. This account cannot be signed into, only continued.
+    password_hash: null,
+    mfa_enabled: false,
+    mfa_required: false,
+    status: 'active',
+    title: null,
+    last_login_at: now,
+    is_guest: true,
+    notification_preferences: { in_app: true, email: false, sms: false, muted_events: [] },
+  } as never)
+
+  const company = await store.insert('companies', {
+    name: 'Guest',
+    type: 'investor',
+    status: 'active',
+    website: null, phone: null,
+    address_line1: null, address_line2: null, city: null, state: null, zip: null,
+    is_demo: true,
+  } as never)
+
+  await store.insert('company_members', {
+    company_id: company.id, user_id: user.id, role: 'owner',
+    invited_by: null, invited_at: now, accepted_at: now,
+  } as never)
+
+  // The investor profile the marketplace needs to rank anything. Left at the
+  // start of onboarding: a guest has verified nothing and should be shown as
+  // having verified nothing.
+  await store.insert('investor_profiles', {
+    company_id: company.id,
+    display_name: 'Guest',
+    investor_type: 'individual',
+    state: null,
+    accreditation_status: 'unverified',
+    onboarding_stage: 'not_started',
+    is_demo: true,
+  } as never)
+
+  const actor = await resolveActor(user.id, company.id)
+  if (!actor) throw new AuthFailure('Guest account could not be created.')
+  return { actor, token: createSessionToken({ userId: user.id, companyId: company.id }) }
+}
+
+/** Whether this actor was created by the one-click demonstration door. */
+export function isGuest(actor: Actor): boolean {
+  return actor.user.is_guest === true
 }
 
 export async function establishSession(token: string): Promise<void> {

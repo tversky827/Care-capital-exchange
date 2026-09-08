@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 32 32">
+  <!-- No rounded corners: iOS applies its own mask, and a radius inside one
+       shows as a dark ring around the icon. -->
+  <rect width="32" height="32" fill="#1f4e79"/>
+  <path d="M11.5 13.6V10.8a3 3 0 0 1 3-3h3a3 3 0 0 1 3 3v2.8z" fill="#ffffff"/>
+  <rect x="8.2" y="15.9" width="15.6" height="4.3" rx="0.9" fill="#ffffff" opacity="0.74"/>
+  <rect x="4.8" y="22.4" width="22.4" height="4.3" rx="0.9" fill="#ffffff" opacity="0.48"/>
+</svg>

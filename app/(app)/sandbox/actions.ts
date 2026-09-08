@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
+import { isGuest } from '@/services/auth'
 import { isAvailable } from '@/lib/flags'
 import { format, parseAmount } from '@/lib/money'
 import {
@@ -52,9 +53,14 @@ export async function enterSandboxAction(mode: SandboxEnvironment): Promise<void
   const flag = mode === 'demo' ? 'DEMO_MODE_ENABLED' : 'PRACTICE_MODE_ENABLED'
   if (!isAvailable(flag)) redirect('/sandbox')
 
-  await enterEnvironment(mode, actor.user.id)
-  await ensureAccount(actor, mode)
-  redirect(mode === 'demo' ? '/sandbox/home' : '/sandbox/home')
+  // Practice reads the live catalogue — a real operator's figures, released
+  // against a confidentiality agreement. An agreement signed by an
+  // unidentified guest protects nothing, so a guest gets the fictional
+  // catalogue and is asked to create an account for the other one.
+  const target: SandboxEnvironment = isGuest(actor) ? 'demo' : mode
+  await enterEnvironment(target, actor.user.id)
+  await ensureAccount(actor, target)
+  redirect('/sandbox/home')
 }
 
 export async function exitSandboxAction(): Promise<void> {
