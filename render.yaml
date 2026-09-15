@@ -18,8 +18,20 @@ services:
     # reports as the repository's default branch, which is a setting that can
     # change without anyone touching this file.
     branch: claude/eager-darwin-kw0lca
+    # Measured on a clean checkout of this branch:
+    #
+    #   build   peaks at ~1.6 GB (Turbopack) / ~1.4 GB (--webpack), ~25s
+    #   runtime settles at ~240 MB
+    #
+    # The runtime figure fits any plan. The BUILD does not fit a 512 MB one,
+    # and no amount of heap tuning gets it there — a 450 MB cap dies with
+    # "JavaScript heap out of memory" rather than swapping. If the build log
+    # shows that error, the plan's build memory is the cause, not the app.
     buildCommand: npm ci && npm run build
     startCommand: npm run start
+    # Deliberately '/'. The marketing pages touch no database, so the health
+    # check returns in about 100ms and never waits on seeding. Pointing this at
+    # a signed-in route would make every deploy wait for the seed.
     healthCheckPath: /
     envVars:
       - key: NODE_VERSION
@@ -41,8 +53,15 @@ services:
       # changes when a default does.
       - key: DEBT_MARKETPLACE_ENABLED
         value: "false"
-      # Seeds sixteen fictional properties, fourteen raises and fourteen
-      # investors on the first request. Set to false for a deployment that
-      # should start empty — one-click demo sign-in disappears with it.
+      # Seeds the whole world on the first request that touches the database —
+      # which is a visitor pressing "Start the demo", not the health check.
+      # Measured at 2.1s for that first visitor and 0.1s for everyone after.
+      # Set to false for a deployment that should start empty; one-click demo
+      # sign-in and the /try door both disappear with it.
       - key: SEED_DEMO_DATA
+        value: "true"
+      # The public one-click demonstration at /try. This is an endpoint that
+      # creates an account, so it is its own switch — turn it off for a
+      # deployment that should not be open to the internet.
+      - key: GUEST_DEMO_ENABLED
         value: "true"

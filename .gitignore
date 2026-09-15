@@ -12,3 +12,9 @@ npm-debug.log*
 next-env.d.ts
 coverage
 /.data
+
+# Throwaway browser-driving scripts used while verifying a change. They have to
+# sit in the project root to resolve playwright-core, which is exactly how one
+# got committed.
+/_*.mjs
+/rt*.mjs

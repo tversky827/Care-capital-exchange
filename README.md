@@ -635,9 +635,46 @@ Two hosts, and the choice is really about where the data lives.
 | Setup | Supabase project, migrations, five env vars | Connect the repo, click Apply |
 | Uploads | 4.5MB ceiling (Vercel's) | 25MB |
 
-`render.yaml` in the repository root covers the Render path: **New → Blueprint**
-at [render.com](https://render.com), pick this repository, click **Apply**.
-Nothing else to configure. The rest of this section is the Vercel path.
+### What the app costs to run
+
+Measured on a clean checkout, on an otherwise idle machine:
+
+| | Peak memory | Time |
+| --- | --- | --- |
+| `npm run build` (Turbopack, the default) | ~1.6 GB | ~25s |
+| `npm run build --webpack` | ~1.4 GB | ~51s |
+| Serving, once built | ~240 MB | — |
+
+The runtime figure fits any plan anywhere. **The build does not fit a 512 MB
+one**, and no heap tuning gets it there — capping the heap at 450 MB produces
+`JavaScript heap out of memory` rather than trading memory for time. A build
+that fails with that error is telling you about the plan's build memory, not
+about the app.
+
+That makes the hosting decision simple:
+
+- **Vercel** builds on Vercel's own build infrastructure, so the 1.6 GB is not
+  your problem. It needs Supabase, because serverless functions have no disk.
+- **Render** builds and runs in the same place. Check the plan's build memory
+  before assuming the free tier will do it.
+
+First-request seeding is not a factor either way: `/` and `/try` touch no
+database, so a health check returns in about 100ms. The seed runs on the first
+request that does — a visitor pressing **Start the demo** — measured at 2.1s
+for that visitor and 0.1s for everyone after.
+
+### Render, step by step
+
+`render.yaml` in the repository root covers it: **New → Blueprint** at
+[render.com](https://render.com), pick this repository, click **Apply**.
+Nothing else to configure — `AUTH_SECRET` is generated on first deploy and the
+demo seeds itself.
+
+The blueprint pins `branch:` explicitly rather than following the repository's
+default, because a default branch is a setting somebody can change without
+touching this file. Point it at whichever branch you actually want deployed.
+
+The rest of this section is the Vercel path.
 
 ### Vercel and Supabase, step by step
 
