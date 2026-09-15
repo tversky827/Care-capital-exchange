@@ -2,8 +2,8 @@
 
 import type { LucideIcon } from 'lucide-react'
 import {
-  Activity, BarChart3, Briefcase, Building2, Coins, FileText, FlaskConical, Gauge, GraduationCap,
-  Home, LayoutDashboard, ListChecks, Presentation, Receipt, Search, Settings, ShieldCheck,
+  Activity, BarChart3, Briefcase, Building2, FileText, FlaskConical, Gauge, GraduationCap,
+  Home, LayoutDashboard, ListChecks, Presentation, Search, Settings, ShieldCheck,
   Sparkles, Store, Users, Wallet, Workflow,
 } from 'lucide-react'
 
@@ -134,27 +134,29 @@ export const LOOKER_NAV: NavGroup[] = [
 /**
  * The investor's navigation.
  *
- * Five destinations, in the order the questions get asked: where am I, what
- * could I buy, what do I own, what is my cash doing, what has happened. Saved
- * offerings, matches, documents and the accreditation profile are reachable
- * from inside those, and none of them earns a permanent slot.
+ * Four. Home is what you are worth, Invest is what you could buy, Portfolio is
+ * what you own, Cash is what is spare — and every other question is answered
+ * inside one of them.
+ *
+ * The six this replaced put Distributions and Activity in the chrome as
+ * permanent destinations. Both are histories, and a history belongs beside the
+ * thing it is a history of: distributions inside the portfolio, activity
+ * inside cash. A navigation item earns its slot by being somewhere people go,
+ * not by being somewhere that exists.
  */
 export const INVESTOR_NAV: NavGroup[] = [
   {
     label: '',
     items: [
       { href: '/investor', label: 'Home', icon: Home },
-      { href: '/investments', label: 'Browse investments', icon: Store, prefix: true, short: 'Browse' },
-      { href: '/investor/portfolio', label: 'My portfolio', icon: Briefcase, prefix: true, short: 'Portfolio' },
+      { href: '/investments', label: 'Invest', icon: Store, prefix: true },
+      { href: '/investor/portfolio', label: 'Portfolio', icon: Briefcase, prefix: true },
       { href: '/investor/cash', label: 'Cash', icon: Wallet, prefix: true },
-      { href: '/investor/activity', label: 'Activity', icon: Receipt, prefix: true },
     ],
   },
   {
     label: '',
     items: [
-      { href: '/investor/distributions', label: 'Distributions', icon: Coins, prefix: true },
-      { href: '/notifications', label: 'Updates', icon: Activity },
       { href: '/sandbox', label: 'Demo & practice', icon: FlaskConical, prefix: true, short: 'Sandbox' },
     ],
   },
@@ -163,20 +165,23 @@ export const INVESTOR_NAV: NavGroup[] = [
 /**
  * Navigation inside the sandbox.
  *
- * The same five destinations as the live investor, pointing at the sandbox's
- * own home, cash and portfolio. The marketplace entry is shared, because the
- * marketplace itself is: practice mode reads the live catalogue, and giving it
- * a separate browse page would be a second implementation of the one screen
- * this whole exercise is meant to teach.
+ * The same four, pointing at the sandbox's own home, portfolio and cash. The
+ * marketplace is shared, because the marketplace itself is — giving practice a
+ * separate browse page would be a second implementation of the one screen the
+ * whole exercise exists to teach.
+ *
+ * What-if, Learn and Presentation mode moved out of the primary row and into
+ * the overflow: they are worth having and they are not where anybody goes
+ * first, and eight items in a row is a menu rather than a navigation.
  */
 export const SANDBOX_NAV: NavGroup[] = [
   {
     label: '',
     items: [
       { href: '/sandbox/home', label: 'Home', icon: Home },
-      { href: '/investments', label: 'Browse investments', icon: Store, prefix: true, short: 'Browse' },
-      { href: '/sandbox/portfolio', label: 'Practice portfolio', icon: Briefcase, prefix: true, short: 'Portfolio' },
-      { href: '/sandbox/cash', label: 'Virtual cash', icon: Wallet, prefix: true, short: 'Cash' },
+      { href: '/investments', label: 'Invest', icon: Store, prefix: true },
+      { href: '/sandbox/portfolio', label: 'Portfolio', icon: Briefcase, prefix: true },
+      { href: '/sandbox/cash', label: 'Cash', icon: Wallet, prefix: true },
     ],
   },
   {

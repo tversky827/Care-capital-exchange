@@ -8,13 +8,12 @@ import { cents, format, formatWhole } from '@/lib/money'
 import { currentEnvironment } from '@/lib/environment'
 import { isGuest } from '@/services/auth'
 import { catalogueFor } from '@/lib/catalogue'
-import { ensureAccount, activityFor } from '@/services/practice/accounts'
-import { portfolioFor, diversification } from '@/services/practice/portfolio'
+import { ensureAccount } from '@/services/practice/accounts'
+import { portfolioFor } from '@/services/practice/portfolio'
 import { searchOfferings } from '@/services/equity/matching'
-import { OfferingCard } from '@/components/equity/offering-card'
-import { Alert, Button, Card, CardBody, PageHeader, Section } from '@/components/ui/primitives'
+import { OfferingRow } from '@/components/equity/offering-row'
+import { Button, Card } from '@/components/ui/primitives'
 import { Graduate } from '../graduate'
-import { formatDate, formatPercent } from '@/lib/utils/format'
 
 export const metadata: Metadata = { title: 'Sandbox' }
 export const dynamic = 'force-dynamic'
@@ -39,11 +38,7 @@ export default async function SandboxHomePage() {
   if (environment === 'live') redirect('/sandbox')
 
   const account = await ensureAccount(actor, environment)
-  const [portfolio, activity] = await Promise.all([
-    portfolioFor(account.id),
-    activityFor(account.id),
-  ])
-  const spread = diversification(portfolio)
+  const portfolio = await portfolioFor(account.id)
 
   const held = new Set(portfolio.holdings.map((row) => row.position.offering_id))
   const open = actor.investor
@@ -53,166 +48,109 @@ export default async function SandboxHomePage() {
     : []
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        eyebrow={account.reference}
-        title={environment === 'demo' ? 'Demonstration' : 'Practice investing'}
-        description={
-          environment === 'demo'
-            ? 'A fictional world, for showing what the product does.'
-            : 'Real opportunities, virtual money. Nothing here creates an investment or an obligation.'
-        }
-      />
+    <div className="mx-auto max-w-2xl space-y-6">
+      {/* ---- one number --------------------------------------------------
+          The four-stat grid this replaced showed the same figure twice and
+          two zeroes whenever nothing was owned, which is every first visit —
+          the moment the screen most needs to be legible. */}
+      <div>
+        <p className="text-[12px] text-ink-muted">
+          {environment === 'demo' ? 'Demonstration account' : 'Practice account'}
+        </p>
+        <p className="tnum mt-1 text-[42px] font-semibold leading-none tracking-[-0.02em] text-ink sm:text-[52px]">
+          {format(portfolio.accountValueCents)}
+        </p>
+        <p className="mt-2 text-[13px] text-ink-secondary">
+          {portfolio.holdings.length === 0
+            ? 'Virtual money, yours to invest. Nothing here is real and nothing can move.'
+            : [
+              `${format(portfolio.cashCents)} to invest`,
+              `${portfolio.active} investment${portfolio.active === 1 ? '' : 's'}`,
+              portfolio.distributionsCents + portfolio.exitProceedsCents > 0
+                ? `${format(cents(portfolio.distributionsCents + portfolio.exitProceedsCents))} paid out`
+                : null,
+            ].filter(Boolean).join('  ·  ')}
+        </p>
 
-      <Card>
-        <dl className="data-grid grid-cols-2 lg:grid-cols-4">
-          <Figure label="Account value" value={format(portfolio.accountValueCents)} hint="virtual cash plus holdings at cost" />
-          <Figure label="Virtual cash" value={format(portfolio.cashCents)} hint="available to deploy" />
-          <Figure label="Invested" value={format(portfolio.investedCents)} hint={`${portfolio.active} holding${portfolio.active === 1 ? '' : 's'}`} />
-          <Figure
-            label="Paid out"
-            value={format(cents(portfolio.distributionsCents + portfolio.exitProceedsCents))}
-            hint="simulated, all time"
-          />
-        </dl>
-        <div className="flex flex-wrap gap-2 border-t border-line px-4 py-3">
-          <Link href="/investments"><Button size="sm" variant="primary">Browse opportunities</Button></Link>
-          <Link href="/sandbox/cash"><Button size="sm">Virtual cash</Button></Link>
-          <Link href="/sandbox/portfolio"><Button size="sm">My practice portfolio</Button></Link>
-        </div>
-      </Card>
-
-      {portfolio.hypotheticalMultiple !== null ? (
-        <Alert tone="neutral" title="These figures are hypothetical">
-          {portfolio.hypotheticalMultiple}× back on every virtual dollar so far
-          {portfolio.hypotheticalIrrPct !== null
-            ? `, ${formatPercent(portfolio.hypotheticalIrrPct)} a year across the quarters simulated`
-            : ''}
-          . Simulated from the assumptions each sponsor has stated, not from anything that happened.
-          Holdings are carried at what was paid for them and never marked up. This is not actual
-          performance and does not predict any.
-        </Alert>
-      ) : null}
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-5">
-          <Section
-            title="Open to invest in"
-            description="The same raises the live marketplace shows, at the access level you already have."
-            actions={<Link href="/investments" className="text-[12px] text-accent hover:underline">See all</Link>}
-          >
-            <CardBody>
-              {open.length === 0 ? (
-                <p className="text-[13px] text-ink-muted">Nothing open that you are not already in.</p>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {open.map((row) => (
-                    <OfferingCard
-                      key={row.offering.id}
-                      offering={row.offering}
-                      terms={row.terms}
-                      deal={row.deal}
-                      facility={row.facility}
-                      match={row.match}
-                      revealIdentity={false}
-                      committedPct={
-                        row.offering.target_raise && row.offering.target_raise > 0
-                          ? row.offering.committed_amount / row.offering.target_raise
-                          : null
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-            </CardBody>
-          </Section>
-
-          {portfolio.holdings.length > 0 ? (
-            <Section
-              title="Your practice holdings"
-              actions={<Link href="/sandbox/portfolio" className="text-[12px] text-accent hover:underline">Full portfolio</Link>}
-            >
-              <CardBody className="space-y-2">
-                {portfolio.holdings.slice(0, 4).map(({ position, offering, returnedCents }) => (
-                  <Link
-                    key={position.id}
-                    href={`/investments/${position.offering_id}`}
-                    className="flex items-center justify-between gap-3 rounded border border-line px-3 py-2.5 hover:border-line-strong"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-medium text-ink">
-                        {offering?.name ?? 'An investment'}
-                      </span>
-                      <span className="block text-[11px] text-ink-muted">
-                        {formatWhole(cents(position.invested_cents))} invested
-                        {returnedCents > 0 ? ` · ${formatWhole(returnedCents)} simulated back` : ''}
-                        {position.status === 'exited' ? ' · exited' : ''}
-                      </span>
-                    </span>
-                    <ArrowRight className="size-4 shrink-0 text-ink-muted" />
-                  </Link>
-                ))}
-              </CardBody>
-            </Section>
-          ) : null}
-        </div>
-
-        <div className="space-y-5">
-          <Section
-            title="How spread it is"
-            description="An educational check, not a judgement about whether the portfolio is a good one."
-          >
-            <CardBody className="space-y-2.5">
-              {spread.rules.map((rule) => (
-                <div key={rule.key} className="flex items-start gap-2">
-                  <span
-                    className={`mt-1 size-2 shrink-0 rounded-full ${rule.met ? 'bg-positive' : 'bg-line-strong'}`}
-                    aria-hidden
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-[12px] font-medium text-ink">{rule.label}</span>
-                    <span className="block text-[11px] text-ink-muted">{rule.detail}</span>
-                  </span>
-                </div>
-              ))}
-              <p className="border-t border-line pt-2 text-[11px] leading-relaxed text-ink-muted">
-                A concentrated portfolio can be the better decision. This measures whether one is
-                spread, and nothing more.
-              </p>
-            </CardBody>
-          </Section>
-
-          <Graduate holdings={portfolio.holdings.length} guest={isGuest(actor)} />
-
-          <Section
-            title="What you have done"
-            actions={<Link href="/sandbox/portfolio" className="text-[12px] text-accent hover:underline">All of it</Link>}
-          >
-            <CardBody className="space-y-2.5">
-              {activity.length === 0 ? (
-                <p className="text-[13px] text-ink-muted">Nothing yet.</p>
-              ) : (
-                activity.slice(0, 8).map((event) => (
-                  <div key={event.id} className="border-b border-line pb-2.5 last:border-b-0 last:pb-0">
-                    <p className="text-[12px] leading-relaxed text-ink">{event.summary}</p>
-                    <p className="text-[11px] text-ink-muted">{formatDate(event.created_at)}</p>
-                  </div>
-                ))
-              )}
-            </CardBody>
-          </Section>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Link href="/investments"><Button variant="primary">Find an investment</Button></Link>
+          <Link href="/sandbox/cash"><Button>Add cash</Button></Link>
         </div>
       </div>
+
+      {/* ---- what you own ------------------------------------------------- */}
+      {portfolio.holdings.length > 0 ? (
+        <div>
+          <SectionLabel>Your investments</SectionLabel>
+          <Card className="overflow-hidden">
+            {portfolio.holdings.slice(0, 5).map(({ position, offering, returnedCents }) => (
+              <Link
+                key={position.id}
+                href={`/investments/${position.offering_id}`}
+                className="flex items-center gap-3 border-b border-line px-4 py-3.5 last:border-b-0 hover:bg-surface-sunken"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-medium text-ink">
+                    {offering?.name ?? 'An investment'}
+                  </span>
+                  <span className="block text-[12px] text-ink-muted">
+                    {position.status === 'exited' ? 'Exited' : 'Held'}
+                    {returnedCents > 0 ? ` · ${formatWhole(returnedCents)} back so far` : ''}
+                  </span>
+                </span>
+                <span className="tnum shrink-0 text-[14px] font-medium text-ink">
+                  {formatWhole(cents(position.invested_cents))}
+                </span>
+                <ArrowRight className="size-4 shrink-0 text-ink-muted" />
+              </Link>
+            ))}
+          </Card>
+          <Link href="/sandbox/portfolio" className="mt-2 inline-block text-[12px] text-accent hover:underline">
+            Full portfolio
+          </Link>
+        </div>
+      ) : null}
+
+      {/* ---- what is open -------------------------------------------------- */}
+      {open.length > 0 ? (
+        <div>
+          <SectionLabel>Open now</SectionLabel>
+          <Card className="overflow-hidden">
+            {open.map((row) => (
+              <OfferingRow
+                key={row.offering.id}
+                offering={row.offering}
+                terms={row.terms}
+                deal={row.deal}
+                facility={row.facility}
+              />
+            ))}
+          </Card>
+          <Link href="/investments" className="mt-2 inline-block text-[12px] text-accent hover:underline">
+            See all
+          </Link>
+        </div>
+      ) : null}
+
+      {isGuest(actor) ? (
+        <p className="border-t border-line pt-4 text-[12px] leading-relaxed text-ink-muted">
+          This is a guest session and will not be here tomorrow.{' '}
+          <Link href="/signup?intent=invest" className="text-accent underline underline-offset-2">
+            Create an account
+          </Link>{' '}
+          to practise against the real opportunities.
+        </p>
+      ) : (
+        <Graduate holdings={portfolio.holdings.length} />
+      )}
     </div>
   )
 }
 
-function Figure({ label, value, hint }: { label: string; value: string; hint: string }) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-4 py-3">
-      <dt className="text-[10px] uppercase tracking-[0.05em] text-ink-muted">{label}</dt>
-      <dd className="tnum mt-1 text-[20px] font-semibold text-ink">{value}</dd>
-      <dd className="mt-0.5 text-[11px] text-ink-muted">{hint}</dd>
-    </div>
+    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">
+      {children}
+    </p>
   )
 }

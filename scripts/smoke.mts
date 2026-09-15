@@ -225,7 +225,7 @@ async function main(): Promise<void> {
     console.log('Investor routes')
     const investor = await cookieFor(investorUser.email)
     failures += await run('investor', investor, [
-      { path: '/investor', expect: 'Available to invest' },
+      { path: '/investor', expect: 'to invest' },
       { path: '/investor/cash', expect: 'Every movement' },
       { path: '/investor/activity', expect: 'Activity' },
       { path: '/investor/distributions', expect: 'Paid to you, all time' },
@@ -241,7 +241,7 @@ async function main(): Promise<void> {
       { path: '/sandbox/learn', allow: [200, 307, 302], absent: 'things tried' },
       { path: '/sandbox/present', allow: [200, 307, 302], absent: 'Start with what is open' },
       { path: '/investor/dashboard', expect: 'Portfolio overview' },
-      { path: '/investments', expect: 'Invest in healthcare properties' },
+      { path: '/investments', expect: 'offerings' },
       { path: '/investor/opportunities', expect: 'Opportunities for you' },
       { path: '/investor/portfolio', expect: 'Portfolio' },
       { path: '/investor/documents', expect: 'Documents' },
@@ -251,16 +251,20 @@ async function main(): Promise<void> {
         ? [
           // Seeded investors have already signed for the offerings they engaged
           // with; this one asserts the detail is reachable once they have.
-          { path: `/investments/${liveOffering.id}`, expect: 'What it could pay' },
+          { path: `/investments/${liveOffering.id}`, expect: 'Where the return comes from' },
           { path: `/investments/compare?ids=${liveOffering.id}`, expect: 'Choose offerings to compare' },
         ]
         : []),
       // The confidentiality gate: the teaser renders, the detail does not.
+      // The absent marker is a section heading from behind the gate, so it
+      // must be kept in step with the page — renaming the section without
+      // renaming this makes the assertion vacuously true, which is worse than
+      // not having it.
       ...(unsigned
         ? [{
           path: `/investments/${unsigned.id}`,
           expect: 'Confidentiality agreement',
-          absent: 'What it could pay',
+          absent: 'Where the return comes from',
         }]
         : []),
     ])

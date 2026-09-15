@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { requireActor } from '@/lib/auth/session'
@@ -97,6 +98,11 @@ export default async function CashPage() {
       <Section
         title="Every movement"
         description="Your balance is the sum of these entries. Nothing else."
+        actions={
+          <Link href="/investor/activity" className="text-[12px] text-accent hover:underline">
+            Including what did not go through
+          </Link>
+        }
       >
         <CardBody className="p-0">
           {entries.length === 0 ? (

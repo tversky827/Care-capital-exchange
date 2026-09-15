@@ -3,12 +3,12 @@ import { db } from '@/db'
 import { requireActor } from '@/lib/auth/session'
 import { subjectOf } from '@/lib/access'
 import { canViewOffering } from '@/lib/policy'
-import { assetNoun } from '@/lib/deal/display'
+
 import { offeringLocation, offeringTitle } from '@/lib/equity/display'
 import { buildSnapshot } from '@/lib/deal/snapshot'
 import { formatCurrency, formatPercent, formatRatio } from '@/lib/utils/format'
 import {
-  Alert, Badge, Card, CardBody, DefinitionList, Progress, Section, Table, Td, Th, Tr,
+  Alert, Badge, CardBody, DefinitionList, Progress, Table, Td, Th, Tr,
 } from '@/components/ui/primitives'
 import { CapitalStackChart } from '@/components/equity/capital-stack-chart'
 import { InvestmentTicket } from './ticket'
@@ -16,7 +16,7 @@ import { PracticeTicket } from './practice-ticket'
 import { NdaGate } from './nda-gate'
 import { AskPanel } from './ask-panel'
 import { BearCase } from './bear-case'
-import { Disclose } from './disclose'
+import { Disclose, Fold } from './disclose'
 import { analyzeOffering, INVESTOR_SUGGESTED_QUESTIONS } from '@/services/equity/analysis'
 import { activeStack } from '@/services/equity/capital-stack'
 import { dataRoomFor, lockedCounts } from '@/services/equity/data-room'
@@ -160,81 +160,69 @@ export default async function OfferingPage({
 
   return (
     <div className="space-y-5">
-      {/* ---- header: the four figures a decision starts from --------------- */}
-      <Card className="p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-[22px] font-semibold text-ink">
-              {offeringTitle(offering, deal, facility, revealIdentity)}
-            </h1>
-            <p className="mt-1 text-[13px] text-ink-secondary">
-              {[
-                offeringLocation(deal, facility, revealIdentity),
-                assetNoun(deal.asset_type),
-                beds ? `${beds} beds` : null,
-                terms?.capital_position === 'preferred_equity' ? 'Preferred equity' : 'Common equity',
-              ].filter(Boolean).join(' · ')}
-            </p>
-          </div>
-          <Badge tone={offering.status === 'live' ? 'positive' : 'neutral'}>
-            {offering.status === 'live' ? 'Open' : offering.status === 'fully_subscribed' ? 'Fully subscribed' : 'Closed'}
-          </Badge>
+      {/* ---- the hero -----------------------------------------------------
+          One number. The four-figure grid that used to sit here asked an
+          investor to read a table before they knew whether they cared, and
+          three of the four were things you want AFTER you are interested, not
+          before. They are one line down, in a sentence. */}
+      <div>
+        <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.015em] text-ink sm:text-[30px]">
+          {offeringTitle(offering, deal, facility, revealIdentity)}
+        </h1>
+        <p className="mt-1 text-[14px] text-ink-secondary">
+          {[
+            offeringLocation(deal, facility, revealIdentity),
+            beds ? `${beds} beds` : null,
+          ].filter(Boolean).join(' · ')}
+        </p>
+
+        <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="tnum text-[46px] font-semibold leading-none tracking-[-0.02em] text-ink sm:text-[56px]">
+            {terms?.target_irr_pct ? formatPercent(terms.target_irr_pct) : '—'}
+          </span>
+          <span className="text-[14px] text-ink-secondary">a year, targeted</span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded border border-line bg-line md:grid-cols-4">
-          <HeaderStat
-            label="Target return"
-            value={terms?.target_irr_pct ? formatPercent(terms.target_irr_pct) : '—'}
-            hint="a year, projected"
-          />
-          <HeaderStat
-            label="Minimum"
-            value={formatCurrency(offering.minimum_investment, { compact: true })}
-            hint="to take part"
-          />
-          <HeaderStat
-            label="Money is tied up"
-            value={terms?.target_hold_months ? `${Math.round(terms.target_hold_months / 12)} years` : '—'}
-            hint="target, could be longer"
-          />
-          <HeaderStat
-            label="Raised so far"
-            value={`${formatCurrency(offering.committed_amount, { compact: true })}${
-              offering.target_raise ? ` of ${formatCurrency(offering.target_raise, { compact: true })}` : ''
-            }`}
-          />
-        </div>
-        {raised !== null ? <Progress className="mt-3" value={raised} showLabel /> : null}
-      </Card>
+        <p className="mt-3 text-[13px] text-ink-secondary">
+          {[
+            offering.minimum_investment
+              ? `${formatCurrency(offering.minimum_investment, { compact: true })} minimum`
+              : null,
+            terms?.target_hold_months
+              ? `about ${Math.round(terms.target_hold_months / 12)} years`
+              : null,
+            raised !== null ? `${Math.round(raised)}% raised` : null,
+            terms?.capital_position === 'preferred_equity' ? 'Preferred equity' : 'Common equity',
+          ].filter(Boolean).join('  ·  ')}
+        </p>
+        {raised !== null ? <Progress className="mt-3 max-w-sm" value={raised} /> : null}
+      </div>
 
-      <Alert tone="neutral">
-        This is a private investment. Your money is committed for years, there is no market to sell
-        your stake in, and you could lose all of it. Every forward-looking figure below is projected
-        from assumptions the sponsor has stated — not a forecast, and not a promise. CareCapital
-        Exchange is not your broker or adviser and does not recommend this or any investment.
-      </Alert>
+      {/* The risk statement, as one line with the whole of it a tap away.
+          It used to be a grey block of five lines at the top of every deal
+          page, which is the surest way to make somebody stop reading risk
+          warnings. The full text is below, and the acknowledgement that
+          actually matters is in the ticket, at the moment it is load-bearing. */}
+      <p className="text-[12px] leading-relaxed text-ink-muted">
+        Private investment: illiquid, projected rather than promised, and you can lose everything.{' '}
+        <a href="#risks" className="text-accent underline underline-offset-2">Read the risks</a>
+      </p>
 
       {!nda.accepted ? (
         <NdaGate offeringId={offeringId} nda={CURRENT_NDA} />
       ) : (
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
-          {/* ---- what it is ------------------------------------------------ */}
-          {analysis ? (
-            <Section title="What this is">
-              <CardBody>
-                <p className="text-[13px] leading-relaxed text-ink-secondary">{analysis.analysis.thesis}</p>
-                <p className="mt-2 text-[11px] text-ink-muted">
-                  Written by the {analysis.generatedBy} analyst from the sponsor&rsquo;s own filings.
-                </p>
-              </CardBody>
-            </Section>
-          ) : null}
+          {/* ---- what it is ------------------------------------------------
+              A paragraph, not a panel. This is the only thing on the page that
+              is always open, because it is the only thing that answers "should
+              I keep reading". */}
+          {analysis ? <Thesis text={analysis.analysis.thesis} by={analysis.generatedBy} /> : null}
 
           {/* ---- what it could pay ----------------------------------------- */}
-          <Section
-            title="What it could pay"
-            description="Projected from the assumptions the sponsor stated. Not a forecast of what will happen."
+          <Fold
+            title="Where the return comes from"
+            meta={projection?.equityMultiple ? `${formatRatio(projection.equityMultiple)} over the hold` : undefined}
           >
             <CardBody className="space-y-4">
               {projection === null || projection.insufficientData !== null ? (
@@ -295,13 +283,14 @@ export default async function OfferingPage({
                 </>
               )}
             </CardBody>
-          </Section>
+          </Fold>
 
           {/* ---- what could go wrong ---------------------------------------- */}
           {risk ? (
-            <Section
+            <Fold
+              id="risks"
               title="What could go wrong"
-              description={`Scored from the deal's own figures. ${Math.round(risk.coverage * 100)}% of the expected inputs were available.`}
+              meta={`${risk.overallScore} · ${risk.overallBand} risk`}
             >
               <CardBody className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -335,14 +324,11 @@ export default async function OfferingPage({
 
                 <BearCase offeringId={offeringId} />
               </CardBody>
-            </Section>
+            </Fold>
           ) : null}
 
           {/* ---- the underlying record -------------------------------------- */}
-          <Section
-            title="The property and the deal"
-            description="Everything behind the figures above, as the sponsor filed it."
-          >
+          <Fold title="The property and the deal">
             <CardBody className="space-y-3">
               <Disclose summary="How the purchase is being paid for">
                 <DefinitionList
@@ -429,10 +415,10 @@ export default async function OfferingPage({
                 </Disclose>
               ) : null}
             </CardBody>
-          </Section>
+          </Fold>
 
           {/* ---- documents --------------------------------------------------- */}
-          <Section title="Documents" description="What has been released to you at your current access level.">
+          <Fold title="Documents" meta={documents.length > 0 ? `${documents.length}` : 'none released'}>
             <CardBody className="space-y-2">
               {documents.length === 0 ? (
                 <p className="text-[13px] text-ink-muted">No documents have been released at your access level.</p>
@@ -456,9 +442,13 @@ export default async function OfferingPage({
                 </p>
               ) : null}
             </CardBody>
-          </Section>
+          </Fold>
 
-          {/* ---- questions ---------------------------------------------------- */}
+          {/* ---- questions ----------------------------------------------------
+              Folded like the rest. Asking a question is something an investor
+              does after reading, not instead of it, and five suggested
+              questions sitting open was the longest block on the page. */}
+          <Fold title="Ask a question">
           <AskPanel
             offeringId={offeringId}
             offeringName={offeringTitle(offering, deal, facility, revealIdentity)}
@@ -469,10 +459,14 @@ export default async function OfferingPage({
             }
             answered={questions}
           />
+          </Fold>
         </div>
 
-        {/* ---- the one action panel ------------------------------------------ */}
-        <div>
+        {/* ---- the one action panel ------------------------------------------
+            Ordered first on a phone. It used to sit after seven sections and
+            3,200 pixels of scrolling, which made the primary action of the
+            page the last thing anybody found. */}
+        <div className="order-first lg:order-none">
           {environment !== 'live' ? (
             <PracticeTicket
               offeringId={offeringId}
@@ -533,5 +527,38 @@ function MoneyRow({ label, prior, latest }: { label: string; prior?: number | nu
       <Td numeric>{formatCurrency(prior ?? null)}</Td>
       <Td numeric>{formatCurrency(latest ?? null)}</Td>
     </Tr>
+  )
+}
+
+/**
+ * The opening paragraph, shortened to its opening.
+ *
+ * The analyst writes a full paragraph and all of it is worth having — but the
+ * first two sentences say what the investment is, and the rest says how the
+ * arithmetic got there. Leading with the whole thing put six lines of density
+ * between the name of the deal and everything else on the page.
+ */
+function Thesis({ text, by }: { text: string; by: string }) {
+  // Split on sentence ends, keeping the punctuation.
+  const sentences = text.match(/[^.!?]+[.!?]+\s*/g) ?? [text]
+  const lead = sentences.slice(0, 2).join('').trim()
+  const rest = sentences.slice(2).join('').trim()
+
+  return (
+    <div>
+      <p className="text-[15px] leading-relaxed text-ink">{lead}</p>
+      {rest ? (
+        <details className="group mt-1.5">
+          <summary className="cursor-pointer list-none text-[12px] text-accent hover:underline [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">More on the numbers</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-2 text-[13px] leading-relaxed text-ink-secondary">{rest}</p>
+        </details>
+      ) : null}
+      <p className="mt-2 text-[11px] text-ink-muted">
+        Written by the {by} analyst from the operator&rsquo;s own filings.
+      </p>
+    </div>
   )
 }

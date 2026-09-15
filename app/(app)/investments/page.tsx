@@ -2,12 +2,12 @@ import { requireActor } from '@/lib/auth/session'
 import { currentEnvironment } from '@/lib/environment'
 import { catalogueFor } from '@/lib/catalogue'
 import { isAvailable } from '@/lib/flags'
-import { OfferingCard } from '@/components/equity/offering-card'
-import { Alert, EmptyState, PageHeader } from '@/components/ui/primitives'
+import { OfferingRow } from '@/components/equity/offering-row'
+import { Alert, Card, EmptyState, PageHeader } from '@/components/ui/primitives'
 import { searchOfferings, type OfferingSearch } from '@/services/equity/matching'
 import { db } from '@/db'
 import { CURRENT_NDA } from '@/lib/equity/nda'
-import { MarketplaceFilters, SaveButton } from './filters'
+import { MarketplaceFilters } from './filters'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,52 +83,44 @@ export default async function InvestmentsPage({
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Invest in healthcare properties"
-        description="Nursing homes, assisted living and behavioural health facilities, offered by the operators who run them. Every figure comes from the operator's own submission."
-      />
-
-      <Alert tone="neutral">
-        These are private investments. Your money is committed for years, you cannot sell your
-        stake, and you can lose all of it. CareCapital Exchange is not a broker-dealer, investment
-        adviser or funding portal, and nothing here is a recommendation to invest.
-      </Alert>
+      <PageHeader title="Invest" />
 
       <MarketplaceFilters total={unfiltered.length} showing={sorted.length} />
 
       {sorted.length === 0 ? (
         <EmptyState
           title="Nothing matches those filters"
-          description="Clearing them shows everything currently open to investors."
+          description="Clearing them shows everything currently open."
         />
       ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {sorted.map((row) => (
-              <div key={row.offering.id} className="space-y-1.5">
-                <OfferingCard
-                  offering={row.offering}
-                  terms={row.terms}
-                  deal={row.deal}
-                  facility={row.facility}
-                  match={row.match}
-                  revealIdentity={signed.has(row.offering.id) || row.deal.company_id === actor.company.id || actor.isAdmin}
-                  committedPct={
-                    row.offering.target_raise && row.offering.target_raise > 0
-                      ? row.offering.committed_amount / row.offering.target_raise
-                      : null
-                  }
-                />
-                {actor.investor ? (
-                  <div className="px-1">
-                    <SaveButton offeringId={row.offering.id} saved={row.saved} />
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </>
+        <Card className="overflow-hidden">
+          {sorted.map((row) => (
+            <OfferingRow
+              key={row.offering.id}
+              offering={row.offering}
+              terms={row.terms}
+              deal={row.deal}
+              facility={row.facility}
+              revealIdentity={
+                signed.has(row.offering.id)
+                || row.deal.company_id === actor.company.id
+                || actor.isAdmin
+              }
+            />
+          ))}
+        </Card>
       )}
+
+      {/* One line, at the end, where it belongs. A five-line warning above the
+          list was read once and skipped forever after; the detail page states
+          the risk for the specific investment, and the ticket asks for an
+          acknowledgement at the moment it means something. */}
+      <p className="text-[12px] leading-relaxed text-ink-muted">
+        Private investments: your money is committed for years, there is no market to sell your
+        stake in, and you can lose all of it. CareCapital Exchange is not a broker-dealer,
+        investment adviser or funding portal, and nothing here is a recommendation.
+      </p>
+
     </div>
   )
 }
